@@ -88,27 +88,28 @@ DEFAULT_ROLE_PERMISSIONS = {
     UserRole.FINANCE_MANAGER: [
         'ledger:read', 'ledger:write', 'ledger:approve', 'ledger:reverse',
         'payroll:read', 'payroll:disburse',
-        'payables:read', 'payables:approve', 'payables:pay',
-        'receivables:read', 'receivables:write',
-        'treasury:read', 'treasury:write', 'treasury:forecast',
+        'payables:read', 'payables:create', 'payables:review', 'payables:approve', 'payables:disburse', 'payables:pay',
+        'receivables:read', 'receivables:write', 'receivables:create',
+        'treasury:read', 'treasury:write', 'treasury:reconcile', 'treasury:forecast',
         'reports:all', 'users:read', 'users:write'
     ],
     UserRole.CHIEF_ACCOUNTANT: [
         'ledger:read', 'ledger:write', 'ledger:reverse',
-        'payroll:read', 'payables:read', 'receivables:read',
-        'treasury:read', 'reports:all'
+        'payroll:read', 'payables:read', 'payables:create', 'payables:review', 'payables:approve',
+        'receivables:read', 'receivables:create',
+        'treasury:read', 'treasury:reconcile', 'reports:all'
     ],
     UserRole.PAYROLL_ACCOUNTANT: [
         'payroll:read', 'payroll:create', 'ledger:read'
     ],
     UserRole.AP_OFFICER: [
-        'payables:read', 'payables:create', 'payables:match'
+        'payables:read', 'payables:create', 'payables:match', 'payables:review'
     ],
     UserRole.AR_OFFICER: [
-        'receivables:read', 'receivables:create'
+        'receivables:read', 'receivables:create', 'receivables:write'
     ],
     UserRole.TREASURY_OFFICER: [
-        'treasury:read', 'treasury:write', 'treasury:reconcile', 'treasury:forecast'
+        'treasury:read', 'treasury:write', 'treasury:reconcile', 'treasury:forecast', 'payables:disburse'
     ],
     UserRole.INTERNAL_AUDITOR: [
         # Read-only across everything, zero write or approve permissions!

@@ -3,22 +3,69 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from apps.common.cache import CacheManager
-from .models import JournalEntry, JournalLine, JournalEntryStatus, Account
+from .models import JournalEntry, JournalLine, JournalEntryStatus, Account, CompanyProfile, Department, CostCentre
 
 class LedgerService:
     @staticmethod
     @transaction.atomic
+    def company_profile_get_or_create(*, country_code: str = 'GH', **defaults) -> CompanyProfile:
+        profile, _ = CompanyProfile.objects.get_or_create(
+            country_code=country_code,
+            defaults={
+                'company_name': defaults.get('company_name', 'SBP Africa Group'),
+                'base_currency': defaults.get('base_currency', 'GHS'),
+                'default_payment_terms_days': defaults.get('default_payment_terms_days', 30),
+                **defaults
+            }
+        )
+        return profile
+
+    @staticmethod
+    @transaction.atomic
+    def company_profile_update(*, country_code: str = 'GH', **fields) -> CompanyProfile:
+        profile = CompanyProfile.objects.select_for_update().get(country_code=country_code)
+        for k, v in fields.items():
+            if hasattr(profile, k) and v is not None:
+                setattr(profile, k, v)
+        profile.save()
+        return profile
+
+    @staticmethod
+    @transaction.atomic
+    def department_create(*, code: str, name: str) -> Department:
+        if Department.objects.filter(code=code).exists():
+            raise ValidationError(f"Department code '{code}' already exists.")
+        return Department.objects.create(code=code.strip().upper(), name=name.strip())
+
+    @staticmethod
+    @transaction.atomic
+    def cost_centre_create(*, code: str, name: str, department_id=None) -> CostCentre:
+        if CostCentre.objects.filter(code=code).exists():
+            raise ValidationError(f"Cost Centre code '{code}' already exists.")
+        dept = Department.objects.get(id=department_id) if department_id else None
+        return CostCentre.objects.create(code=code.strip().upper(), name=name.strip(), department=dept)
+
+    @staticmethod
+    @transaction.atomic
     def account_create(*, code: str, name: str, account_type: str, currency: str = 'GHS',
-                       country_code: str = 'GH', description: str = '') -> Account:
+                       country_code: str = 'GH', description: str = '',
+                       subtype: str = '', parent_id=None, opening_balance: Decimal = Decimal('0.0000'),
+                       opening_balance_date=None, allow_direct_posting: bool = True) -> Account:
         if Account.objects.filter(code=code).exists():
             raise ValidationError(f"Account code '{code}' already exists.")
+        parent = Account.objects.get(id=parent_id) if parent_id else None
         account = Account.objects.create(
             code=code,
             name=name,
             account_type=account_type,
+            subtype=subtype,
+            parent=parent,
             currency=currency,
             country_code=country_code,
-            description=description
+            description=description,
+            opening_balance=opening_balance,
+            opening_balance_date=opening_balance_date,
+            allow_direct_posting=allow_direct_posting
         )
         CacheManager.delete_pattern("fms:accounts:")
         return account

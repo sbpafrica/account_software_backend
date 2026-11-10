@@ -1,5 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework import status
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter
@@ -9,15 +10,20 @@ from apps.common.pagination import CustomPageNumberPagination, paginate_queryset
 from apps.users.permissions import HasPermissionCode, CountryScopedAccess
 from apps.ledger.selectors import (
     account_list, account_detail, journal_entry_list,
-    journal_entry_detail, trial_balance_get
+    journal_entry_detail, trial_balance_get,
+    profit_and_loss_get, balance_sheet_get,
+    cash_flow_statement_get, gl_account_statement_get
 )
 from apps.ledger.services import LedgerService
 from apps.ledger.serializers import (
     AccountOutputSerializer, AccountCreateInputSerializer, AccountUpdateInputSerializer,
     JournalEntryOutputSerializer, JournalEntryCreateInputSerializer,
-    JournalEntryReverseInputSerializer, TrialBalanceOutputSerializer
+    JournalEntryReverseInputSerializer, TrialBalanceOutputSerializer,
+    ProfitAndLossOutputSerializer, BalanceSheetOutputSerializer,
+    CashFlowStatementOutputSerializer, GLAccountStatementOutputSerializer,
+    CEOExecutiveDashboardOutputSerializer
 )
-from apps.ledger.models import Account
+from apps.ledger.models import Account, Department, CostCentre
 
 
 class AccountListAdminApi(APIView):
@@ -296,4 +302,242 @@ class TrialBalanceAdminApi(APIView):
         country = request.query_params.get('country')
         data = trial_balance_get(as_of_date=date_str, country_code=country)
         return api_success(data=data, message="Trial balance generated successfully.")
+
+
+# ============================================================================
+# COMPANY PROFILE & ACCOUNTING DIMENSIONS
+# ============================================================================
+
+from apps.ledger.models import CompanyProfile, Department, CostCentre
+from apps.ledger.serializers import (
+    CompanyProfileOutputSerializer, CompanyProfileUpdateInputSerializer,
+    DepartmentOutputSerializer, DepartmentCreateInputSerializer,
+    CostCentreOutputSerializer, CostCentreCreateInputSerializer
+)
+
+
+class CompanyProfileAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('ledger:write')()]
+
+    @extend_schema(
+        tags=['Ledger - Company Profile'],
+        operation_id='admin_ledger_company_profile_get',
+        summary='Retrieve company profile for country',
+        description='Retrieve company profile, legal entity details, reporting currency, and tax registration for a country.',
+        parameters=[OpenApiParameter(name='country', description='Two-letter country code (e.g. GH, NG, CI)', required=False, type=str)],
+        responses={status.HTTP_200_OK: CompanyProfileOutputSerializer}
+    )
+    def get(self, request):
+        country = request.query_params.get('country', 'GH')
+        profile = LedgerService.company_profile_get_or_create(country_code=country)
+        return api_success(data=CompanyProfileOutputSerializer(profile).data)
+
+    @extend_schema(
+        tags=['Ledger - Company Profile'],
+        operation_id='admin_ledger_company_profile_update',
+        summary='Update company profile for country',
+        description='Update legal entity name, base currency, fiscal year end, address, or tax registration details.',
+        parameters=[OpenApiParameter(name='country', description='Two-letter country code (e.g. GH, NG, CI)', required=False, type=str)],
+        request=CompanyProfileUpdateInputSerializer,
+        responses={status.HTTP_200_OK: CompanyProfileOutputSerializer}
+    )
+    def put(self, request):
+        country = request.query_params.get('country', 'GH')
+        serializer = CompanyProfileUpdateInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        profile = LedgerService.company_profile_update(country_code=country, **serializer.validated_data)
+        return api_success(data=CompanyProfileOutputSerializer(profile).data, message="Company profile updated successfully.")
+
+
+class DepartmentListCreateAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('ledger:read')()]
+
+    @extend_schema(
+        tags=['Ledger - Departments & Cost Centres'],
+        operation_id='admin_ledger_department_list',
+        summary='List active organizational departments',
+        description='Retrieve all active departments used for financial reporting and cost allocation.',
+        responses={status.HTTP_200_OK: DepartmentOutputSerializer(many=True)}
+    )
+    def get(self, request):
+        depts = Department.objects.filter(is_active=True)
+        return api_success(data=DepartmentOutputSerializer(depts, many=True).data)
+
+    @extend_schema(
+        tags=['Ledger - Departments & Cost Centres'],
+        operation_id='admin_ledger_department_create',
+        summary='Create new organizational department',
+        description='Register a new department with unique code and name for departmental P&L tracking.',
+        request=DepartmentCreateInputSerializer,
+        responses={status.HTTP_201_CREATED: DepartmentOutputSerializer}
+    )
+    def post(self, request):
+        if not request.user.has_permission_code('ledger:write'):
+            return Response({'detail': 'Permission denied: ledger:write required'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = DepartmentCreateInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        dept = LedgerService.department_create(**serializer.validated_data)
+        return api_success(data=DepartmentOutputSerializer(dept).data, message="Department created successfully.", status_code=status.HTTP_201_CREATED)
+
+
+class CostCentreListCreateAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('ledger:read')()]
+
+    @extend_schema(
+        tags=['Ledger - Departments & Cost Centres'],
+        operation_id='admin_ledger_cost_centre_list',
+        summary='List active cost centres',
+        description='Retrieve all active cost centres along with their parent department associations.',
+        responses={status.HTTP_200_OK: CostCentreOutputSerializer(many=True)}
+    )
+    def get(self, request):
+        centres = CostCentre.objects.filter(is_active=True).select_related('department')
+        return api_success(data=CostCentreOutputSerializer(centres, many=True).data)
+
+    @extend_schema(
+        tags=['Ledger - Departments & Cost Centres'],
+        operation_id='admin_ledger_cost_centre_create',
+        summary='Create new cost centre',
+        description='Register a new cost centre mapped to a department for granular expense tracking.',
+        request=CostCentreCreateInputSerializer,
+        responses={status.HTTP_201_CREATED: CostCentreOutputSerializer}
+    )
+    def post(self, request):
+        if not request.user.has_permission_code('ledger:write'):
+            return Response({'detail': 'Permission denied: ledger:write required'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = CostCentreCreateInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        centre = LedgerService.cost_centre_create(**serializer.validated_data)
+        return api_success(data=CostCentreOutputSerializer(centre).data, message="Cost centre created successfully.", status_code=status.HTTP_201_CREATED)
+
+
+class ProfitAndLossAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('ledger:read')()]
+
+    @extend_schema(
+        tags=['Ledger - Reports'],
+        operation_id='admin_ledger_profit_and_loss',
+        summary='Retrieve standard Profit and Loss Statement (Income Statement)',
+        parameters=[
+            OpenApiParameter(name='start_date', description='Start Date (YYYY-MM-DD)', required=False, type=str),
+            OpenApiParameter(name='end_date', description='End Date (YYYY-MM-DD)', required=False, type=str),
+            OpenApiParameter(name='cost_centre', description='Cost Centre code filter', required=False, type=str),
+            OpenApiParameter(name='country', description='Country code filter (e.g. GH)', required=False, type=str),
+        ],
+        responses={
+            status.HTTP_200_OK: ProfitAndLossOutputSerializer,
+            status.HTTP_403_FORBIDDEN: dict
+        }
+    )
+    def get(self, request):
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        cost_centre = request.query_params.get('cost_centre')
+        country = request.query_params.get('country')
+        report = profit_and_loss_get(
+            start_date=start_date,
+            end_date=end_date,
+            cost_centre=cost_centre,
+            country_code=country
+        )
+        return api_success(data=report, message="Profit and Loss statement retrieved successfully.")
+
+
+class BalanceSheetAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('ledger:read')()]
+
+    @extend_schema(
+        tags=['Ledger - Reports'],
+        operation_id='admin_ledger_balance_sheet',
+        summary='Retrieve Balance Sheet Statement (Statement of Financial Position)',
+        parameters=[
+            OpenApiParameter(name='as_of_date', description='As of Date (YYYY-MM-DD)', required=False, type=str),
+            OpenApiParameter(name='country', description='Country code filter (e.g. GH)', required=False, type=str),
+        ],
+        responses={
+            status.HTTP_200_OK: BalanceSheetOutputSerializer,
+            status.HTTP_403_FORBIDDEN: dict
+        }
+    )
+    def get(self, request):
+        as_of_date = request.query_params.get('as_of_date')
+        country = request.query_params.get('country')
+        report = balance_sheet_get(as_of_date=as_of_date, country_code=country)
+        return api_success(data=report, message="Balance sheet retrieved successfully.")
+
+
+class CashFlowStatementAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('ledger:read')()]
+
+    @extend_schema(
+        tags=['Ledger - Reports'],
+        operation_id='admin_ledger_cash_flow_statement',
+        summary='Retrieve Cash Flow Statement (Indirect Method)',
+        parameters=[
+            OpenApiParameter(name='start_date', description='Start Date (YYYY-MM-DD)', required=False, type=str),
+            OpenApiParameter(name='end_date', description='End Date (YYYY-MM-DD)', required=False, type=str),
+            OpenApiParameter(name='country', description='Country code filter (e.g. GH)', required=False, type=str),
+        ],
+        responses={
+            status.HTTP_200_OK: CashFlowStatementOutputSerializer,
+            status.HTTP_403_FORBIDDEN: dict
+        }
+    )
+    def get(self, request):
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        country = request.query_params.get('country')
+        report = cash_flow_statement_get(start_date=start_date, end_date=end_date, country_code=country)
+        return api_success(data=report, message="Cash flow statement retrieved successfully.")
+
+
+class GLAccountStatementAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('ledger:read')()]
+
+    @extend_schema(
+        tags=['Ledger - Reports'],
+        operation_id='admin_ledger_gl_account_statement',
+        summary='Retrieve running GL Account Statement',
+        parameters=[
+            OpenApiParameter(name='start_date', description='Start Date (YYYY-MM-DD)', required=False, type=str),
+            OpenApiParameter(name='end_date', description='End Date (YYYY-MM-DD)', required=False, type=str),
+        ],
+        responses={
+            status.HTTP_200_OK: GLAccountStatementOutputSerializer,
+            status.HTTP_404_NOT_FOUND: dict
+        }
+    )
+    def get(self, request, account_id):
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        report = gl_account_statement_get(account_id=account_id, start_date=start_date, end_date=end_date)
+        return api_success(data=report, message="GL account statement retrieved successfully.")
+
+
+class CEOExecutiveDashboardAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('ledger:read')()]
+
+    @extend_schema(
+        tags=['Ledger - Reports'],
+        operation_id='admin_ledger_ceo_executive_dashboard',
+        summary='Retrieve Executive CEO Real-Time Intelligence Dashboard',
+        description='Synthesizes real-time enterprise metrics across liquidity, receivables, payables, profitability, and financial ratios.',
+        parameters=[
+            OpenApiParameter(name='as_of_date', description='As of Date (YYYY-MM-DD)', required=False, type=str),
+            OpenApiParameter(name='country', description='Country code filter (e.g. GH)', required=False, type=str),
+        ],
+        responses={
+            status.HTTP_200_OK: CEOExecutiveDashboardOutputSerializer,
+            status.HTTP_403_FORBIDDEN: dict
+        }
+    )
+    def get(self, request):
+        as_of = request.query_params.get('as_of_date')
+        country = request.query_params.get('country')
+        from apps.ledger.selectors import ceo_executive_dashboard_get
+        dashboard = ceo_executive_dashboard_get(as_of_date=as_of, country_code=country)
+        return api_success(data=dashboard, message="CEO Executive Dashboard generated successfully.")
+
+
+
 

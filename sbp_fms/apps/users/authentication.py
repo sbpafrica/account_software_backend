@@ -33,10 +33,10 @@ except ImportError:
 class JWTTokenService:
     """
     Service for generating and managing JWT token pairs for users.
-    Enriches JWT claims with role, country scope, and superuser status.
+    Enriches JWT claims with role, country scope, superuser status, and active SaaS tenant organization.
     """
     @staticmethod
-    def get_tokens_for_user(user: User) -> dict:
+    def get_tokens_for_user(user: User, organization=None) -> dict:
         refresh = RefreshToken.for_user(user)
 
         # Custom claims embedded in the JWT payload
@@ -44,6 +44,38 @@ class JWTTokenService:
         refresh['role'] = user.role.name if user.role else None
         refresh['assigned_country'] = user.assigned_country
         refresh['is_superuser'] = user.is_superuser
+
+        # Multi-tenant SaaS organization claims
+        org_role = None
+        if organization is None:
+            # Check user's default organization membership
+            try:
+                membership = user.organization_memberships.select_related('organization').filter(
+                    organization__is_active=True
+                ).order_by('-is_default', 'created_at').first()
+                if membership:
+                    organization = membership.organization
+                    org_role = membership.role
+            except Exception:
+                pass
+        else:
+            try:
+                membership = user.organization_memberships.filter(organization=organization).first()
+                if membership:
+                    org_role = membership.role
+            except Exception:
+                pass
+
+        if organization:
+            refresh['org_id'] = str(organization.id)
+            refresh['org_slug'] = organization.slug
+            refresh['org_name'] = organization.name
+            refresh['org_role'] = org_role
+        else:
+            refresh['org_id'] = None
+            refresh['org_slug'] = None
+            refresh['org_name'] = None
+            refresh['org_role'] = None
 
         return {
             'refresh': str(refresh),

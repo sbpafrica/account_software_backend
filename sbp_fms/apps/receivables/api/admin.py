@@ -1,5 +1,6 @@
 from rest_framework.views import APIView
-from rest_framework import status, Response
+from rest_framework import status
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
@@ -178,7 +179,9 @@ class ClientInvoiceListAdminApi(APIView):
             client=client,
             issue_date=data['issue_date'],
             due_date=data['due_date'],
-            total_amount=data['total_amount']
+            total_amount=data.get('total_amount'),
+            lines_data=data.get('lines'),
+            user=request.user
         )
         return api_success(
             data=ClientInvoiceOutputSerializer(inv).data,
@@ -272,4 +275,122 @@ class AgingReportAdminApi(APIView):
     def get(self, request):
         report = aging_report_get(country_code=request.query_params.get('country'))
         return api_success(data=report, message="Aging report generated successfully.")
+
+
+class ClientInvoiceIssueAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('receivables:create')()]
+
+    @extend_schema(
+        tags=['Receivables - Invoices Admin'],
+        operation_id='admin_receivables_invoice_issue',
+        summary='Issue customer invoice and post to General Ledger',
+        description='Transitions draft customer invoice to ISSUED, computes finalized taxes/retentions, and generates Accounts Receivable double-entry journal lines in GL.',
+        request=None,
+        responses={
+            status.HTTP_200_OK: ClientInvoiceOutputSerializer,
+            status.HTTP_400_BAD_REQUEST: dict,
+            status.HTTP_403_FORBIDDEN: dict
+        }
+    )
+    def post(self, request, invoice_id):
+        inv = ReceivablesService.invoice_issue(invoice_id=str(invoice_id), user=request.user)
+        return api_success(data=ClientInvoiceOutputSerializer(inv).data, message="Invoice issued and posted to General Ledger.")
+
+
+from apps.receivables.selectors import payment_receipt_list, payment_receipt_detail, customer_statement_get
+from apps.receivables.serializers import (
+    PaymentReceiptOutputSerializer, PaymentReceiptCreateInputSerializer,
+    CustomerStatementOutputSerializer
+)
+
+
+class PaymentReceiptListAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('receivables:read')()]
+    pagination_class = CustomPageNumberPagination
+
+    @extend_schema(
+        tags=['Receivables - Receipts Admin'],
+        operation_id='admin_receivables_receipt_list',
+        summary='List customer payment receipts',
+        description='Retrieve paginated list of client payment receipts with optional filtering by client UUID and receipt status.',
+        parameters=[
+            OpenApiParameter(name='client_id', description='Filter by client UUID', required=False, type=str),
+            OpenApiParameter(name='status', description='Filter by receipt status (DRAFT, CONFIRMED, CANCELLED)', required=False, type=str),
+        ],
+        responses={status.HTTP_200_OK: PaymentReceiptOutputSerializer(many=True)}
+    )
+    def get(self, request):
+        client_id = request.query_params.get('client_id')
+        r_status = request.query_params.get('status')
+        receipts = payment_receipt_list(client_id=client_id, status=r_status)
+        return paginate_queryset(receipts, request, PaymentReceiptOutputSerializer)
+
+    @extend_schema(
+        tags=['Receivables - Receipts Admin'],
+        operation_id='admin_receivables_receipt_create',
+        summary='Create and allocate payment receipt',
+        description='Record incoming customer payment, allocate received amount across outstanding invoices, and post bank debit and accounts receivable credit entries to GL.',
+        request=PaymentReceiptCreateInputSerializer,
+        responses={
+            status.HTTP_201_CREATED: PaymentReceiptOutputSerializer,
+            status.HTTP_400_BAD_REQUEST: dict,
+            status.HTTP_403_FORBIDDEN: dict
+        }
+    )
+    def post(self, request):
+        if not request.user.has_permission_code('receivables:create'):
+            return Response({'detail': 'Permission denied: receivables:create required'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = PaymentReceiptCreateInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        receipt = ReceivablesService.receipt_create_and_allocate(
+            receipt_number=data['receipt_number'],
+            receipt_date=data.get('receipt_date'),
+            client_id=data['client_id'],
+            amount_received=data['amount_received'],
+            payment_method=data.get('payment_method', 'BANK_TRANSFER'),
+            bank_account_id=data['bank_account_id'],
+            reference_number=data.get('reference_number', ''),
+            description=data.get('description', ''),
+            allocations_data=data.get('allocations'),
+            user=request.user
+        )
+        return api_success(data=PaymentReceiptOutputSerializer(receipt).data, message="Payment receipt confirmed and posted to GL.", status_code=status.HTTP_201_CREATED)
+
+
+class PaymentReceiptDetailAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('receivables:read')()]
+
+    @extend_schema(
+        tags=['Receivables - Receipts Admin'],
+        operation_id='admin_receivables_receipt_detail',
+        summary='Retrieve payment receipt details',
+        description='Fetch full payment receipt information including allocated invoice breakdowns and payment method.',
+        responses={status.HTTP_200_OK: PaymentReceiptOutputSerializer}
+    )
+    def get(self, request, receipt_id):
+        receipt = payment_receipt_detail(receipt_id=receipt_id)
+        return api_success(data=PaymentReceiptOutputSerializer(receipt).data)
+
+
+class CustomerStatementAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('receivables:read')()]
+
+    @extend_schema(
+        tags=['Receivables - Reports Admin'],
+        operation_id='admin_receivables_customer_statement',
+        summary='Retrieve customer account statement',
+        description='Generate running customer ledger statement with opening balance, invoices, payments, and closing balance for a specified date range.',
+        parameters=[
+            OpenApiParameter(name='date_from', description='Start Date (YYYY-MM-DD)', required=False, type=str),
+            OpenApiParameter(name='date_to', description='End Date (YYYY-MM-DD)', required=False, type=str),
+        ],
+        responses={status.HTTP_200_OK: CustomerStatementOutputSerializer}
+    )
+    def get(self, request, client_id):
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        statement = customer_statement_get(client_id=str(client_id), date_from=date_from, date_to=date_to)
+        return api_success(data=statement, message="Customer statement generated successfully.")
+
 

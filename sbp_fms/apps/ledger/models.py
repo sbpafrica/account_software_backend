@@ -2,7 +2,7 @@ from decimal import Decimal
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.conf import settings
-from apps.common.models import BaseModel
+from apps.common.models import BaseModel, TenantModel
 
 class AccountType(models.TextChoices):
     ASSET = 'ASSET', 'Asset (1000-1999)'
@@ -12,13 +12,56 @@ class AccountType(models.TextChoices):
     DIRECT_COST = 'DIRECT_COST', 'Direct Cost (5000-5999)'
     OPEX = 'OPEX', 'Operating Expense (6000-6999)'
 
+class CompanyProfile(TenantModel):
+    company_name = models.CharField(max_length=255)
+    registration_number = models.CharField(max_length=100, blank=True, default='')
+    tax_identification_number = models.CharField(max_length=100, blank=True, default='')
+    business_address = models.TextField(blank=True, default='')
+    telephone = models.CharField(max_length=50, blank=True, default='')
+    email = models.EmailField(blank=True, default='')
+    base_currency = models.CharField(max_length=3, default='GHS')
+    financial_year_start_month = models.PositiveSmallIntegerField(default=1)
+    financial_year_end_month = models.PositiveSmallIntegerField(default=12)
+    default_payment_terms_days = models.PositiveSmallIntegerField(default=30)
+    invoice_prefix = models.CharField(max_length=20, default='INV-')
+    voucher_prefix = models.CharField(max_length=20, default='PV-')
+    receipt_prefix = models.CharField(max_length=20, default='REC-')
+    expense_prefix = models.CharField(max_length=20, default='EXP-')
+    journal_prefix = models.CharField(max_length=20, default='JV-')
+    country_code = models.CharField(max_length=2, default='GH')
+
+    def __str__(self):
+        return f"{self.company_name} ({self.country_code})"
+
+class Department(BaseModel):
+    code = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+class CostCentre(BaseModel):
+    code = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=100)
+    department = models.ForeignKey(Department, null=True, blank=True, on_delete=models.SET_NULL, related_name='cost_centres')
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
 class Account(BaseModel):
     code = models.CharField(max_length=20, unique=True, db_index=True)
     name = models.CharField(max_length=255)
     account_type = models.CharField(max_length=20, choices=AccountType.choices)
+    subtype = models.CharField(max_length=50, blank=True, default='')
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='children')
     currency = models.CharField(max_length=3, default='GHS')
     country_code = models.CharField(max_length=2, default='GH')
     is_active = models.BooleanField(default=True)
+    allow_direct_posting = models.BooleanField(default=True)
+    opening_balance = models.DecimalField(max_digits=18, decimal_places=4, default=Decimal('0.0000'))
+    opening_balance_date = models.DateField(null=True, blank=True)
     description = models.TextField(blank=True, default='')
 
     class Meta:

@@ -103,3 +103,75 @@ class TestReceivablesCRUD:
         # 6. DELETE INVOICE
         res_del = api_client.delete(detail_url)
         assert res_del.status_code == status.HTTP_400_BAD_REQUEST  # Cannot delete with payment
+
+    def test_invoice_lines_and_payment_receipt_allocation_lifecycle(self, api_client, superuser):
+        api_client.force_authenticate(user=superuser)
+
+        client = Client.objects.create(name="Beta Logistics", code="CL-BETA", country_code="GH")
+        from apps.ledger.models import Account, AccountType
+        from apps.treasury.models import BankAccount
+        gl_bank = Account.objects.create(code="1025-FNB-TEST", name="FNB Bank Test", account_type=AccountType.ASSET)
+        bank_acc = BankAccount.objects.create(bank_name="FNB Ghana", account_number="987654321", gl_account=gl_bank)
+
+        # 1. Create invoice with line items
+        url_inv = reverse("client-invoice-list-admin")
+        inv_payload = {
+            "invoice_number": "INV-LINE-001",
+            "client_id": str(client.id),
+            "issue_date": "2026-11-01",
+            "due_date": "2026-11-30",
+            "lines": [
+                {
+                    "description": "HR Outsourcing Services",
+                    "quantity": 10.0,
+                    "unit_of_measurement": "Man-Days",
+                    "unit_price": 500.0,
+                    "discount": 0.0,
+                    "tax_code": "VAT",
+                    "tax_rate": 0.15
+                }
+            ]
+        }
+        res_inv = api_client.post(url_inv, inv_payload, format="json")
+        assert res_inv.status_code == status.HTTP_201_CREATED
+        inv_data = res_inv.data["data"]
+        inv_id = inv_data["id"]
+        # Subtotal: 5000, Tax (15%): 750, Total: 5750
+        assert Decimal(str(inv_data["subtotal"])) == Decimal("5000.0000")
+        assert Decimal(str(inv_data["tax_amount"])) == Decimal("750.0000")
+        assert Decimal(str(inv_data["total_amount"])) == Decimal("5750.0000")
+        assert inv_data["journal_entry"] is not None  # Automatically posted GL!
+
+        # 2. Record Payment Receipt allocating partial amount
+        rec_url = reverse("payment-receipt-list-admin")
+        rec_payload = {
+            "receipt_number": "REC-2026-001",
+            "receipt_date": "2026-11-10",
+            "client_id": str(client.id),
+            "bank_account_id": str(bank_acc.id),
+            "amount_received": 5750.0,
+            "payment_method": "BANK_TRANSFER",
+            "allocations": [
+                {
+                    "invoice_id": inv_id,
+                    "amount": 5750.0
+                }
+            ]
+        }
+        res_rec = api_client.post(rec_url, rec_payload, format="json")
+        assert res_rec.status_code == status.HTTP_201_CREATED
+        assert res_rec.data["data"]["journal_entry"] is not None
+
+        # Verify invoice is now PAID
+        inv_detail_url = reverse("client-invoice-detail-admin", kwargs={"invoice_id": inv_id})
+        res_chk = api_client.get(inv_detail_url)
+        assert res_chk.data["data"]["status"] == ClientInvoiceStatus.PAID
+        assert Decimal(str(res_chk.data["data"]["balance_due"])) == Decimal("0.0000")
+
+        # 3. Customer Statement
+        stmt_url = reverse("customer-statement-admin", kwargs={"client_id": str(client.id)})
+        res_stmt = api_client.get(stmt_url)
+        assert res_stmt.status_code == status.HTTP_200_OK
+        assert len(res_stmt.data["data"]["transactions"]) == 2
+        assert Decimal(str(res_stmt.data["data"]["closing_balance"])) == Decimal("0.0000")
+

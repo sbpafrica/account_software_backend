@@ -5,11 +5,180 @@ from .models import UserRole
 class IsSuperUser(permissions.BasePermission):
     """
     [SUPERUSER PERMISSION]:
-    Allows access strictly to authenticated Superusers.
-    Used for creating and assigning enterprise roles, granular permissions, and managing staff.
+    Allows access to authenticated Superusers or Super Admin role.
     """
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.is_superuser)
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        user_role = request.user.role.name if request.user.role else None
+        return user_role == UserRole.SUPER_ADMIN
+
+
+class CanManageUsers(permissions.BasePermission):
+    """
+    [FUNCTIONAL USER MANAGEMENT PERMISSION]:
+    Allows functional administrators and managers to manage users, assign roles,
+    and allocate permissions.
+    Permits:
+    1. Superusers and users with the SUPER_ADMIN role.
+    2. Functional Managers (e.g. FINANCE_MANAGER).
+    3. Users with granular permission codes: 'users:write', 'users:manage', 'users:assign_role',
+       'users:assign_permissions', or wildcard '*'.
+    4. SaaS Tenant Organization Owners and Administrators.
+    """
+    def has_permission(self, request, view):
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.is_superuser:
+            return True
+
+        user_role = user.role.name if user.role else None
+        if user_role in [UserRole.SUPER_ADMIN, UserRole.FINANCE_MANAGER]:
+            return True
+
+        if (
+            user.has_permission_code('users:write')
+            or user.has_permission_code('users:manage')
+            or user.has_permission_code('users:assign_role')
+            or user.has_permission_code('users:assign_permissions')
+            or user.has_permission_code('*')
+        ):
+            return True
+
+        # Check tenant membership
+        current_org = getattr(request, 'organization', None)
+        if not current_org:
+            try:
+                from apps.organizations.context import get_current_organization
+                current_org = get_current_organization()
+            except ImportError:
+                pass
+
+        if current_org:
+            try:
+                from apps.organizations.models import OrganizationMembership, OrganizationRole
+                if OrganizationMembership.objects.filter(
+                    organization=current_org,
+                    user=user,
+                    role__in=[OrganizationRole.OWNER, OrganizationRole.ADMIN]
+                ).exists():
+                    return True
+            except Exception:
+                pass
+
+        return False
+
+
+class CanViewUsers(permissions.BasePermission):
+    """
+    Allows viewing the list and details of users.
+    Permits superusers, functional managers, accountants, auditors, or users with 'users:read'.
+    """
+    def has_permission(self, request, view):
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.is_superuser:
+            return True
+
+        user_role = user.role.name if user.role else None
+        if user_role in [
+            UserRole.SUPER_ADMIN,
+            UserRole.FINANCE_MANAGER,
+            UserRole.CHIEF_ACCOUNTANT,
+            UserRole.INTERNAL_AUDITOR
+        ]:
+            return True
+
+        if (
+            user.has_permission_code('users:read')
+            or user.has_permission_code('users:write')
+            or user.has_permission_code('*')
+        ):
+            return True
+
+        # Check tenant membership
+        current_org = getattr(request, 'organization', None)
+        if not current_org:
+            try:
+                from apps.organizations.context import get_current_organization
+                current_org = get_current_organization()
+            except ImportError:
+                pass
+
+        if current_org:
+            try:
+                from apps.organizations.models import OrganizationMembership, OrganizationRole
+                if OrganizationMembership.objects.filter(
+                    organization=current_org,
+                    user=user,
+                    role__in=[
+                        OrganizationRole.OWNER,
+                        OrganizationRole.ADMIN,
+                        OrganizationRole.ACCOUNTANT,
+                        OrganizationRole.AUDITOR
+                    ]
+                ).exists():
+                    return True
+            except Exception:
+                pass
+
+        return False
+
+
+class CanManageRoles(permissions.BasePermission):
+    """
+    Allows creating roles and configuring role permission mappings.
+    Permits Superusers, Super Admins, Finance Managers, Tenant Admins,
+    or users granted 'roles:write' / 'roles:manage' / '*'.
+    """
+    def has_permission(self, request, view):
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.is_superuser:
+            return True
+
+        user_role = user.role.name if user.role else None
+        if user_role in [UserRole.SUPER_ADMIN, UserRole.FINANCE_MANAGER]:
+            return True
+
+        if (
+            user.has_permission_code('roles:write')
+            or user.has_permission_code('roles:manage')
+            or user.has_permission_code('roles:assign_permissions')
+            or user.has_permission_code('*')
+        ):
+            return True
+
+        # Check tenant membership (Owner or Admin)
+        current_org = getattr(request, 'organization', None)
+        if not current_org:
+            try:
+                from apps.organizations.context import get_current_organization
+                current_org = get_current_organization()
+            except ImportError:
+                pass
+
+        if current_org:
+            try:
+                from apps.organizations.models import OrganizationMembership, OrganizationRole
+                if OrganizationMembership.objects.filter(
+                    organization=current_org,
+                    user=user,
+                    role__in=[OrganizationRole.OWNER, OrganizationRole.ADMIN]
+                ).exists():
+                    return True
+            except Exception:
+                pass
+
+        return False
 
 
 class HasPermissionCode:

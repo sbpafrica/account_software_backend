@@ -3,14 +3,17 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
-from apps.common.responses import api_success
+from apps.common.responses import api_success, api_error
 from apps.common.pagination import CustomPageNumberPagination, paginate_queryset
 from apps.users.selectors import (
     user_list, user_detail, role_list, role_detail,
     permission_list, permission_detail
 )
 from apps.users.services import UserService, RoleService, PermissionService
-from apps.users.permissions import IsFinanceManagerOrAdmin, IsSuperUser
+from apps.users.permissions import (
+    IsFinanceManagerOrAdmin, IsSuperUser,
+    CanManageUsers, CanManageRoles, CanViewUsers
+)
 from apps.users.serializers import (
     UserOutputSerializer, UserCreateInputSerializer, UserUpdateInputSerializer,
     UserRoleAssignInputSerializer, UserDirectPermissionsAssignInputSerializer,
@@ -27,10 +30,11 @@ from apps.users.serializers import (
 
 class PermissionListCreateAdminApi(APIView):
     """
-    [SUPERUSER ONLY]:
+    [FUNCTIONAL & SUPERUSER ADMIN]:
     List all system permissions or create a new granular permission code.
+    Accessible to Superusers, Super Admins, or administrators with 'roles:write' permission.
     """
-    permission_classes = [IsAuthenticated, IsSuperUser]
+    permission_classes = [IsAuthenticated, CanManageRoles]
     pagination_class = CustomPageNumberPagination
 
     @extend_schema(
@@ -76,10 +80,10 @@ class PermissionListCreateAdminApi(APIView):
 
 class PermissionDetailAdminApi(APIView):
     """
-    [SUPERUSER ONLY]:
+    [FUNCTIONAL & SUPERUSER ADMIN]:
     Retrieve, update, or remove a granular permission code.
     """
-    permission_classes = [IsAuthenticated, IsSuperUser]
+    permission_classes = [IsAuthenticated, CanManageRoles]
 
     @extend_schema(
         tags=['Users - Permissions Admin'],
@@ -145,10 +149,11 @@ class PermissionDetailAdminApi(APIView):
 
 class RoleListCreateAdminApi(APIView):
     """
-    [SUPERUSER ONLY]:
+    [FUNCTIONAL & SUPERUSER ADMIN]:
     List all enterprise roles or create a new role with associated permission codes.
+    Accessible to Superusers, Super Admins, and functional administrators with 'roles:write' permission.
     """
-    permission_classes = [IsAuthenticated, IsSuperUser]
+    permission_classes = [IsAuthenticated, CanManageRoles]
     pagination_class = CustomPageNumberPagination
 
     @extend_schema(
@@ -188,10 +193,10 @@ class RoleListCreateAdminApi(APIView):
 
 class RoleDetailAdminApi(APIView):
     """
-    [SUPERUSER ONLY]:
+    [FUNCTIONAL & SUPERUSER ADMIN]:
     Retrieve, update, or remove an enterprise role.
     """
-    permission_classes = [IsAuthenticated, IsSuperUser]
+    permission_classes = [IsAuthenticated, CanManageRoles]
 
     @extend_schema(
         tags=['Users - Roles Admin'],
@@ -254,10 +259,10 @@ class RoleDetailAdminApi(APIView):
 
 class RoleAssignPermissionsAdminApi(APIView):
     """
-    [SUPERUSER ONLY]:
+    [FUNCTIONAL & SUPERUSER ADMIN]:
     Assign or synchronize a set of granular permission codes to an enterprise role.
     """
-    permission_classes = [IsAuthenticated, IsSuperUser]
+    permission_classes = [IsAuthenticated, CanManageRoles]
 
     @extend_schema(
         tags=['Users - Roles Admin'],
@@ -278,12 +283,12 @@ class RoleAssignPermissionsAdminApi(APIView):
 
 
 # ============================================================================
-# 3. USER MANAGEMENT & ASSIGNMENT (Superuser Exclusively)
+# 3. USER MANAGEMENT & ASSIGNMENT (Superadmin & Functional Administrators)
 # ============================================================================
 
 class UserListAdminApi(APIView):
     """Lists users with filtering by role and country."""
-    permission_classes = [IsAuthenticated, IsFinanceManagerOrAdmin]
+    permission_classes = [IsAuthenticated, CanViewUsers]
     pagination_class = CustomPageNumberPagination
 
     @extend_schema(
@@ -312,10 +317,11 @@ class UserListAdminApi(APIView):
 
 class UserCreateAdminApi(APIView):
     """
-    [SUPERUSER ONLY]:
+    [FUNCTIONAL & SUPERUSER ADMIN]:
     Provisions a new internal finance staff account with an assigned role and country.
+    Accessible to Superusers, Super Admins, Finance Managers, and staff with 'users:write' permission.
     """
-    permission_classes = [IsAuthenticated, IsSuperUser]
+    permission_classes = [IsAuthenticated, CanManageUsers]
 
     @extend_schema(
         tags=['Users - Users Admin'],
@@ -342,7 +348,7 @@ class UserCreateAdminApi(APIView):
 
 class UserDetailAdminApi(APIView):
     """Get or modify an internal user's account."""
-    permission_classes = [IsAuthenticated, IsFinanceManagerOrAdmin]
+    permission_classes = [IsAuthenticated, CanManageUsers]
 
     @extend_schema(
         tags=['Users - Users Admin'],
@@ -369,11 +375,6 @@ class UserDetailAdminApi(APIView):
         }
     )
     def put(self, request, user_id):
-        if not request.user.is_superuser:
-            return Response(
-                {"detail": "Only a Superuser can modify user roles and country scoping."},
-                status=status.HTTP_403_FORBIDDEN
-            )
         serializer = UserUpdateInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = UserService.user_update(user_id=user_id, **serializer.validated_data)
@@ -404,10 +405,13 @@ class UserDetailAdminApi(APIView):
         }
     )
     def delete(self, request, user_id):
-        if not request.user.is_superuser:
-            return Response(
-                {"detail": "Only a Superuser can delete staff accounts."},
-                status=status.HTTP_403_FORBIDDEN
+        is_super = request.user.is_superuser or (
+            request.user.role and request.user.role.name == 'SUPER_ADMIN'
+        )
+        if not is_super:
+            return api_error(
+                message="Only Super Administrators can delete staff accounts.",
+                status_code=status.HTTP_403_FORBIDDEN
             )
         UserService.user_delete(user_id=user_id)
         return api_success(message="User deleted successfully.", status_code=status.HTTP_200_OK)
@@ -415,19 +419,22 @@ class UserDetailAdminApi(APIView):
 
 class UserAssignRoleAdminApi(APIView):
     """
-    [SUPERUSER ONLY]:
+    [FUNCTIONAL & SUPERUSER ADMIN]:
     Assigns an enterprise role to a specific user.
+    Accessible to Superusers, Super Admins, Finance Managers, Tenant Admins, or staff with 'users:write' permission.
     """
-    permission_classes = [IsAuthenticated, IsSuperUser]
+    permission_classes = [IsAuthenticated, CanManageUsers]
 
     @extend_schema(
         tags=['Users - Users Admin'],
         operation_id='admin_user_assign_role',
         summary='Assign role to user',
+        description='Assigns an operational or enterprise role to a staff member. Accessible to functional administrators and superusers.',
         request=UserRoleAssignInputSerializer,
         responses={
             status.HTTP_200_OK: UserOutputSerializer,
-            status.HTTP_400_BAD_REQUEST: dict
+            status.HTTP_400_BAD_REQUEST: dict,
+            status.HTTP_403_FORBIDDEN: dict
         }
     )
     def post(self, request, user_id):
@@ -439,19 +446,22 @@ class UserAssignRoleAdminApi(APIView):
 
 class UserAssignPermissionsAdminApi(APIView):
     """
-    [SUPERUSER ONLY]:
+    [FUNCTIONAL & SUPERUSER ADMIN]:
     Assigns direct granular permissions to a specific user.
+    Accessible to Superusers, Super Admins, Finance Managers, Tenant Admins, or staff with 'users:write' permission.
     """
-    permission_classes = [IsAuthenticated, IsSuperUser]
+    permission_classes = [IsAuthenticated, CanManageUsers]
 
     @extend_schema(
         tags=['Users - Users Admin'],
         operation_id='admin_user_assign_permissions',
         summary='Assign direct permissions to user',
+        description='Allocates granular permission capabilities directly to a staff member. Accessible to functional administrators and superusers.',
         request=UserDirectPermissionsAssignInputSerializer,
         responses={
             status.HTTP_200_OK: UserOutputSerializer,
-            status.HTTP_400_BAD_REQUEST: dict
+            status.HTTP_400_BAD_REQUEST: dict,
+            status.HTTP_403_FORBIDDEN: dict
         }
     )
     def post(self, request, user_id):
@@ -463,10 +473,10 @@ class UserAssignPermissionsAdminApi(APIView):
 
 class UserDeactivateAdminApi(APIView):
     """
-    [SUPERUSER ONLY]:
+    [FUNCTIONAL & SUPERUSER ADMIN]:
     Deactivates user access.
     """
-    permission_classes = [IsAuthenticated, IsSuperUser]
+    permission_classes = [IsAuthenticated, CanManageUsers]
 
     @extend_schema(
         tags=['Users - Users Admin'],

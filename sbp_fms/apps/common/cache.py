@@ -15,10 +15,19 @@ def make_cache_key(prefix: str, identifier: Any = None, filters: Optional[dict] 
     """
     [DETERMINISTIC CACHE KEY BUILDER]:
     Constructs a deterministic cache key for selectors based on namespace, identifier,
-    and normalized Python filter dictionaries / kwargs.
+    normalized Python filter dictionaries / kwargs, and multi-tenant organization context.
     """
     clean_prefix = prefix.strip(':')
     parts = [clean_prefix]
+
+    # Prepend multi-tenant organization context if present
+    try:
+        from apps.organizations.context import get_current_organization
+        current_org = get_current_organization()
+        if current_org:
+            parts.insert(0, f"org:{current_org.id}")
+    except Exception:
+        pass
 
     if identifier is not None:
         parts.append(str(identifier))
@@ -91,10 +100,13 @@ class CacheManager:
 
             # 3. LocMemCache fallback inspection
             locmem_cache = getattr(cache, '_cache', None)
-            if isinstance(locmem_cache, dict):
+            if hasattr(locmem_cache, 'keys'):
                 matched = [k for k in list(locmem_cache.keys()) if prefix in k]
                 for k in matched:
-                    cache.delete(k)
+                    if hasattr(cache, '_delete'):
+                        cache._delete(k)
+                    else:
+                        locmem_cache.pop(k, None)
                 return
         except Exception:
             pass
@@ -185,6 +197,34 @@ class CacheManager:
     def invalidate_taxation() -> None:
         """Invalidates statutory tax rule caches."""
         CacheManager.delete_pattern("fms:tax:")
+
+    @staticmethod
+    def invalidate_assets() -> None:
+        """Invalidates fixed assets, categories, and depreciation schedules."""
+        CacheManager.delete_pattern("fms:assets:")
+        CacheManager.delete_pattern("fms:depr:")
+
+    @staticmethod
+    def invalidate_budgeting() -> None:
+        """Invalidates budgets, budget lines, and variance reports."""
+        CacheManager.delete_pattern("fms:budget:")
+        CacheManager.delete_pattern("fms:variance:")
+
+    @staticmethod
+    def invalidate_contracts() -> None:
+        """Invalidates contracts, milestones, and contract profitability reports."""
+        CacheManager.delete_pattern("fms:contracts:")
+
+    @staticmethod
+    def invalidate_consolidation() -> None:
+        """Invalidates exchange rates and foreign exchange revaluation runs."""
+        CacheManager.delete_pattern("fms:fx:")
+        CacheManager.delete_pattern("fms:rates:")
+
+    @staticmethod
+    def invalidate_organizations() -> None:
+        """Invalidates tenant organization metadata and user memberships."""
+        CacheManager.delete_pattern("fms:organizations:")
 
     @staticmethod
     def invalidate_all() -> None:
