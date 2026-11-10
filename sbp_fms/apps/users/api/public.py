@@ -1,10 +1,13 @@
-from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
+from drf_spectacular.utils import extend_schema
+from apps.common.responses import api_success
 from apps.users.services import UserService
-from apps.users.serializers import UserLoginInputSerializer, UserOutputSerializer
+from apps.users.serializers import (
+    UserLoginInputSerializer, UserOutputSerializer,
+    UserAuthTokensSerializer, UserMeOutputSerializer
+)
 
 
 class UserLoginPublicApi(APIView):
@@ -14,22 +17,30 @@ class UserLoginPublicApi(APIView):
     """
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=['Users - Authentication'],
+        operation_id='public_user_login',
+        summary='Authenticate user and generate JWT tokens',
+        description='Takes user email and password, returning JWT access & refresh tokens with assigned role and permissions.',
+        request=UserLoginInputSerializer,
+        responses={
+            status.HTTP_200_OK: UserAuthTokensSerializer,
+            status.HTTP_400_BAD_REQUEST: dict,
+        }
+    )
     def post(self, request):
         serializer = UserLoginInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        try:
-            user, tokens = UserService.user_authenticate(**serializer.validated_data)
-        except DjangoValidationError as exc:
-            msg = exc.messages[0] if hasattr(exc, 'messages') and exc.messages else str(exc)
-            return Response({'detail': msg}, status=status.HTTP_400_BAD_REQUEST)
+        user, tokens = UserService.user_authenticate(**serializer.validated_data)
 
-        return Response({
+        payload = {
             'access': tokens['access'],
             'refresh': tokens['refresh'],
             'token': tokens['access'],  # For backward-compatibility with Bearer token clients
             'user': UserOutputSerializer(user).data,
             'permissions': user.get_all_permissions()
-        }, status=status.HTTP_200_OK)
+        }
+        return api_success(data=payload, message="Authentication successful.", status_code=status.HTTP_200_OK)
 
 
 class UserMePublicApi(APIView):
@@ -39,9 +50,22 @@ class UserMePublicApi(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=['Users - Authentication'],
+        operation_id='public_user_me',
+        summary='Retrieve authenticated user profile',
+        description='Returns current authenticated user profile, primary role, country scope, and active permissions.',
+        responses={
+            status.HTTP_200_OK: UserMeOutputSerializer,
+            status.HTTP_401_UNAUTHORIZED: dict,
+        }
+    )
     def get(self, request):
         user = request.user
-        return Response({
+        payload = {
             'user': UserOutputSerializer(user).data,
             'permissions': user.get_all_permissions()
-        })
+        }
+        return api_success(data=payload, message="User profile retrieved successfully.")
+
+

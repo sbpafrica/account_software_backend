@@ -33,6 +33,44 @@ class PayrollEscrowService:
 
     @staticmethod
     @transaction.atomic
+    def payroll_batch_update(*, batch_id, client_name: str = None, month: int = None,
+                             year: int = None, total_net_salaries: Decimal = None,
+                             total_statutory_taxes: Decimal = None,
+                             total_management_fee: Decimal = None,
+                             status: str = None) -> PayrollBatch:
+        batch = PayrollBatch.objects.select_for_update().get(id=batch_id)
+        if batch.status == PayrollBatchStatus.DISBURSED:
+            raise ValidationError("Cannot modify a disbursed payroll batch.")
+        if client_name is not None:
+            batch.client_name = client_name.strip()
+        if month is not None:
+            batch.month = month
+        if year is not None:
+            batch.year = year
+        if total_net_salaries is not None:
+            batch.total_net_salaries = total_net_salaries
+        if total_statutory_taxes is not None:
+            batch.total_statutory_taxes = total_statutory_taxes
+        if total_management_fee is not None:
+            batch.total_management_fee = total_management_fee
+        if status is not None:
+            batch.status = status
+        batch.save()
+        CacheManager.invalidate_payroll()
+        return batch
+
+    @staticmethod
+    @transaction.atomic
+    def payroll_batch_delete(*, batch_id) -> None:
+        batch = PayrollBatch.objects.get(id=batch_id)
+        if batch.status == PayrollBatchStatus.DISBURSED:
+            raise ValidationError("Cannot delete a disbursed payroll batch.")
+        batch.delete()
+        CacheManager.invalidate_payroll()
+
+
+    @staticmethod
+    @transaction.atomic
     def disburse_payroll_batch(*, batch_id: str, user) -> PayrollBatch:
         batch = PayrollBatch.objects.select_for_update().get(id=batch_id)
         if batch.status == PayrollBatchStatus.DISBURSED:

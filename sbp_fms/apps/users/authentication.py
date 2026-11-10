@@ -12,6 +12,24 @@ class SBPTokenAuthentication(JWTAuthentication):
     pass
 
 
+try:
+    from drf_spectacular.extensions import OpenApiAuthenticationExtension
+
+    class SBPTokenAuthenticationScheme(OpenApiAuthenticationExtension):
+        target_class = 'apps.users.authentication.SBPTokenAuthentication'
+        name = 'sbpTokenAuth'
+
+        def get_security_definition(self, auto_schema):
+            return {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+            }
+except ImportError:
+    pass
+
+
+
 class JWTTokenService:
     """
     Service for generating and managing JWT token pairs for users.

@@ -63,3 +63,45 @@ def api_error(
     **kwargs
 ) -> Response:
     return ApiResponse.error(message=message, errors=errors, status_code=status_code, code=code, **kwargs)
+
+
+def api_response_postprocessing_hook(result, generator, request, public):
+    """
+    [DRF-SPECTACULAR POSTPROCESSING HOOK]:
+    Wraps OpenAPI response schemas for 200/201 endpoints in the standardized ApiResponse envelope:
+    {
+        "success": true,
+        "message": "...",
+        "data": { ... }
+    }
+    Paginated schemas (which are already wrapped by CustomPageNumberPagination)
+    and schemas that already define the standard envelope are preserved.
+    """
+    paths = result.get('paths', {})
+    for path, path_item in paths.items():
+        for method, operation in path_item.items():
+            if not isinstance(operation, dict):
+                continue
+            responses = operation.get('responses', {})
+            for code, resp in responses.items():
+                if str(code) in ('200', '201'):
+                    content = resp.get('content', {}).get('application/json', {})
+                    schema = content.get('schema')
+                    if not schema:
+                        continue
+                    ref = schema.get('$ref', '')
+                    if 'Paginated' in ref:
+                        continue
+                    if schema.get('type') == 'object' and 'success' in schema.get('properties', {}):
+                        continue
+                    content['schema'] = {
+                        'type': 'object',
+                        'properties': {
+                            'success': {'type': 'boolean', 'example': True},
+                            'message': {'type': 'string', 'example': 'Operation completed successfully.'},
+                            'data': schema
+                        },
+                        'required': ['success', 'message']
+                    }
+    return result
+

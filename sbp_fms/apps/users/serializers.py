@@ -114,3 +114,31 @@ class UserDirectPermissionsAssignInputSerializer(serializers.Serializer):
         child=serializers.CharField(),
         required=True
     )
+
+
+class UserUpdateInputSerializer(serializers.Serializer):
+
+    first_name = serializers.CharField(max_length=150, required=False)
+    last_name = serializers.CharField(max_length=150, required=False)
+    role = serializers.CharField(required=False, allow_null=True)
+    assigned_country = serializers.CharField(max_length=2, required=False, allow_null=True)
+    is_active = serializers.BooleanField(required=False)
+
+
+class UserAuthTokensSerializer(serializers.Serializer):
+    access = serializers.CharField()
+    refresh = serializers.CharField()
+    token = serializers.CharField()
+    user = UserOutputSerializer()
+    permissions = serializers.ListField(child=serializers.CharField())
+
+
+class UserMeOutputSerializer(serializers.Serializer):
+    user = UserOutputSerializer()
+    permissions = serializers.ListField(child=serializers.CharField())
+
+
+class UserDeactivateOutputSerializer(serializers.Serializer):
+    status = serializers.CharField()
+    user_id = serializers.CharField()
+

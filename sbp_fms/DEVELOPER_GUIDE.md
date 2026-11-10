@@ -138,8 +138,14 @@ High-volume financial queries (e.g., Trial Balances, Overdue Debtor Aging, and C
 * `GET /api/v1/ledger/public/accounts/`: Active chart of accounts list for dropdowns (cached).
 * `GET /api/v1/ledger/admin/accounts/`: Full COA list with type filters (`permission: ledger:read`).
 * `POST /api/v1/ledger/admin/accounts/create/`: Create COA account (`permission: ledger:write`).
+* `GET /api/v1/ledger/admin/accounts/<uuid:id>/`: Retrieve COA account details (`permission: ledger:read`).
+* `PUT /api/v1/ledger/admin/accounts/<uuid:id>/`: Update COA account (`permission: ledger:write`).
+* `PATCH /api/v1/ledger/admin/accounts/<uuid:id>/`: Partially update COA account (`permission: ledger:write`).
+* `DELETE /api/v1/ledger/admin/accounts/<uuid:id>/`: Delete COA account (`permission: ledger:write`).
 * `GET /api/v1/ledger/admin/entries/`: List journal entries (`permission: ledger:read`).
 * `POST /api/v1/ledger/admin/entries/post/`: Atomically post balanced journal (`permission: ledger:write`).
+* `GET /api/v1/ledger/admin/entries/<uuid:id>/`: Retrieve journal entry details (`permission: ledger:read`).
+* `DELETE /api/v1/ledger/admin/entries/<uuid:id>/`: Delete draft journal entry (`permission: ledger:write`).
 * `POST /api/v1/ledger/admin/entries/<uuid:id>/reverse/`: Reverse posted journal (`permission: ledger:reverse`).
 * `GET /api/v1/ledger/admin/trial-balance/?country=GH&date=YYYY-MM-DD`: Cached trial balance audit.
 
@@ -147,29 +153,76 @@ High-volume financial queries (e.g., Trial Balances, Overdue Debtor Aging, and C
 * `GET /api/v1/payroll-escrow/public/client-balance/<uuid:client_id>/`: Client escrow deposit balance (cached).
 * `GET /api/v1/payroll-escrow/admin/batches/`: List client payroll batches (`permission: payroll:read`).
 * `POST /api/v1/payroll-escrow/admin/batches/`: Create monthly payroll batch (`permission: payroll:create`).
+* `GET /api/v1/payroll-escrow/admin/batches/<uuid:id>/`: Retrieve payroll batch details (`permission: payroll:read`).
+* `PUT /api/v1/payroll-escrow/admin/batches/<uuid:id>/`: Update payroll batch (`permission: payroll:create`).
+* `PATCH /api/v1/payroll-escrow/admin/batches/<uuid:id>/`: Partially update payroll batch (`permission: payroll:create`).
+* `DELETE /api/v1/payroll-escrow/admin/batches/<uuid:id>/`: Delete payroll batch (`permission: payroll:create`).
 * `POST /api/v1/payroll-escrow/admin/batches/<uuid:id>/disburse/`: Release payroll through solvency gatekeeper (`permission: payroll:disburse`).
 
 ### Accounts Payable (`/api/v1/payables/`)
 * `GET /api/v1/payables/public/invoices/<uuid:id>/status/`: Vendor checks bill status.
 * `GET /api/v1/payables/admin/suppliers/`: List registered vendors (`permission: payables:read`).
+* `POST /api/v1/payables/admin/suppliers/`: Register new vendor (`permission: payables:create`).
+* `GET /api/v1/payables/admin/suppliers/<uuid:id>/`: Retrieve vendor profile (`permission: payables:read`).
+* `PUT /api/v1/payables/admin/suppliers/<uuid:id>/`: Update vendor profile (`permission: payables:create`).
+* `PATCH /api/v1/payables/admin/suppliers/<uuid:id>/`: Partially update vendor profile (`permission: payables:create`).
+* `DELETE /api/v1/payables/admin/suppliers/<uuid:id>/`: Delete vendor profile (`permission: payables:create`).
+* `GET /api/v1/payables/admin/purchase-orders/`: List purchase orders (`permission: payables:read`).
+* `POST /api/v1/payables/admin/purchase-orders/`: Create purchase order (`permission: payables:create`).
+* `GET /api/v1/payables/admin/purchase-orders/<uuid:id>/`: Retrieve PO details (`permission: payables:read`).
+* `PUT /api/v1/payables/admin/purchase-orders/<uuid:id>/`: Update PO (`permission: payables:create`).
+* `DELETE /api/v1/payables/admin/purchase-orders/<uuid:id>/`: Delete PO (`permission: payables:create`).
+* `GET /api/v1/payables/admin/goods-received-notes/`: List GRNs (`permission: payables:read`).
+* `POST /api/v1/payables/admin/goods-received-notes/`: Create GRN (`permission: payables:create`).
+* `GET /api/v1/payables/admin/goods-received-notes/<uuid:id>/`: Retrieve GRN details (`permission: payables:read`).
+* `PUT /api/v1/payables/admin/goods-received-notes/<uuid:id>/`: Update GRN (`permission: payables:create`).
+* `DELETE /api/v1/payables/admin/goods-received-notes/<uuid:id>/`: Delete GRN (`permission: payables:create`).
 * `GET /api/v1/payables/admin/invoices/`: List supplier invoices (`permission: payables:read`).
+* `POST /api/v1/payables/admin/invoices/`: Create supplier invoice (`permission: payables:create`).
+* `GET /api/v1/payables/admin/invoices/<uuid:id>/`: Retrieve supplier invoice details (`permission: payables:read`).
+* `PUT /api/v1/payables/admin/invoices/<uuid:id>/`: Update supplier invoice (`permission: payables:create`).
+* `DELETE /api/v1/payables/admin/invoices/<uuid:id>/`: Delete supplier invoice (`permission: payables:create`).
 * `POST /api/v1/payables/admin/invoices/<uuid:id>/match/`: Execute 3-way match against PO and GRN (`permission: payables:match`).
 
 ### Accounts Receivable (`/api/v1/receivables/`)
 * `GET /api/v1/receivables/public/clients/<uuid:client_id>/invoices/`: Client billing statements.
 * `GET /api/v1/receivables/admin/clients/`: List clients and credit limits (`permission: receivables:read`).
+* `POST /api/v1/receivables/admin/clients/`: Create client account (`permission: receivables:create`).
+* `GET /api/v1/receivables/admin/clients/<uuid:id>/`: Retrieve client details (`permission: receivables:read`).
+* `PUT /api/v1/receivables/admin/clients/<uuid:id>/`: Update client details (`permission: receivables:create`).
+* `PATCH /api/v1/receivables/admin/clients/<uuid:id>/`: Partially update client (`permission: receivables:create`).
+* `DELETE /api/v1/receivables/admin/clients/<uuid:id>/`: Delete client (`permission: receivables:create`).
 * `GET /api/v1/receivables/admin/invoices/`: List client invoices (`permission: receivables:read`).
+* `POST /api/v1/receivables/admin/invoices/`: Issue client invoice (`permission: receivables:create`).
+* `GET /api/v1/receivables/admin/invoices/<uuid:id>/`: Retrieve invoice details (`permission: receivables:read`).
+* `PUT /api/v1/receivables/admin/invoices/<uuid:id>/`: Update invoice (`permission: receivables:create`).
+* `DELETE /api/v1/receivables/admin/invoices/<uuid:id>/`: Delete invoice (`permission: receivables:create`).
 * `GET /api/v1/receivables/admin/aging-report/?country=GH`: 30/60/90-day overdue debtor buckets (cached).
 
 ### Treasury & Cash Management (`/api/v1/treasury/`)
 * `POST /api/v1/treasury/public/webhook/`: Bank statement feed webhook.
 * `GET /api/v1/treasury/admin/accounts/`: Bank accounts list (`permission: treasury:read`).
-* `GET /api/v1/treasury/admin/forecast/`: 30/60/90-day executive liquidity forecast (cached).
+* `POST /api/v1/treasury/admin/accounts/`: Create bank account linked to GL (`permission: treasury:write`).
+* `GET /api/v1/treasury/admin/accounts/<uuid:id>/`: Retrieve bank account details (`permission: treasury:read`).
+* `PUT /api/v1/treasury/admin/accounts/<uuid:id>/`: Update bank account (`permission: treasury:write`).
+* `DELETE /api/v1/treasury/admin/accounts/<uuid:id>/`: Delete bank account (`permission: treasury:write`).
 * `GET /api/v1/treasury/admin/transactions/`: Bank statement lines (`permission: treasury:read`).
+* `POST /api/v1/treasury/admin/transactions/`: Record bank transaction (`permission: treasury:write`).
+* `GET /api/v1/treasury/admin/transactions/<uuid:id>/`: Retrieve transaction details (`permission: treasury:read`).
+* `PUT /api/v1/treasury/admin/transactions/<uuid:id>/`: Update transaction (`permission: treasury:write`).
+* `DELETE /api/v1/treasury/admin/transactions/<uuid:id>/`: Delete transaction (`permission: treasury:write`).
+* `POST /api/v1/treasury/admin/transactions/<uuid:id>/reconcile/`: Reconcile transaction against GL (`permission: treasury:reconcile`).
+* `GET /api/v1/treasury/admin/forecast/`: 30/60/90-day executive liquidity forecast (cached).
 
 ### Taxation (`/api/v1/taxation/`)
 * `POST /api/v1/taxation/public/calculate/`: Salary tax & Ghana SSNIT calculator.
 * `GET /api/v1/taxation/admin/rules/`: Multi-country tax brackets (`permission: tax:read`).
+* `POST /api/v1/taxation/admin/rules/`: Create statutory tax rule (`permission: tax:write`).
+* `GET /api/v1/taxation/admin/rules/<uuid:id>/`: Retrieve tax rule details (`permission: tax:read`).
+* `PUT /api/v1/taxation/admin/rules/<uuid:id>/`: Update tax rule (`permission: tax:write`).
+* `PATCH /api/v1/taxation/admin/rules/<uuid:id>/`: Partially update tax rule (`permission: tax:write`).
+* `DELETE /api/v1/taxation/admin/rules/<uuid:id>/`: Delete tax rule (`permission: tax:write`).
+
 
 ---
 

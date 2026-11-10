@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import Optional
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import QuerySet
+from django.shortcuts import get_object_or_404
 from apps.common.cache import CacheManager, make_cache_key, KEY_CASH_FORECAST
 from apps.common.filters import apply_dict_filters, merge_filters
 from apps.receivables.models import ClientInvoice, ClientInvoiceStatus
@@ -24,6 +24,17 @@ def bank_account_list(*, filters: Optional[dict] = None, country_code: Optional[
     return results
 
 
+def bank_account_detail(*, account_id) -> BankAccount:
+    cache_key = f"fms:treasury:accounts:detail:{account_id}"
+    cached = CacheManager.get(cache_key)
+    if cached is not None:
+        return cached
+
+    account = get_object_or_404(BankAccount.objects.select_related('gl_account'), id=account_id)
+    CacheManager.set(cache_key, account, timeout=1800)
+    return account
+
+
 def bank_transaction_list(
     *,
     filters: Optional[dict] = None,
@@ -41,6 +52,17 @@ def bank_transaction_list(
     results = list(qs)
     CacheManager.set(cache_key, results, timeout=1800)
     return results
+
+
+def bank_transaction_detail(*, transaction_id) -> BankTransaction:
+    cache_key = f"fms:treasury:transactions:detail:{transaction_id}"
+    cached = CacheManager.get(cache_key)
+    if cached is not None:
+        return cached
+
+    tx = get_object_or_404(BankTransaction.objects.select_related('bank_account'), id=transaction_id)
+    CacheManager.set(cache_key, tx, timeout=1800)
+    return tx
 
 
 def liquidity_forecast_get() -> dict:

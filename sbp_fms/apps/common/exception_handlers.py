@@ -1,5 +1,9 @@
 import logging
-from django.core.exceptions import ValidationError as DjangoValidationError, PermissionDenied as DjangoPermissionDenied
+from django.core.exceptions import (
+    ValidationError as DjangoValidationError,
+    PermissionDenied as DjangoPermissionDenied,
+    ObjectDoesNotExist
+)
 from django.http import Http404
 from django.db import IntegrityError
 from rest_framework.views import exception_handler
@@ -48,7 +52,7 @@ def custom_exception_handler(exc, context):
                 "detail": message
             }, status=status_code)
 
-        if isinstance(exc, Http404):
+        if isinstance(exc, (Http404, ObjectDoesNotExist)):
             return Response({
                 "success": False,
                 "message": "The requested resource was not found.",
@@ -89,6 +93,9 @@ def custom_exception_handler(exc, context):
     # 3. Standardize DRF Response into uniform envelope
     data = response.data
     status_code = response.status_code
+
+    if isinstance(data, dict) and 'success' in data and not data['success']:
+        return response
 
     if isinstance(data, dict):
         # Extract main error message

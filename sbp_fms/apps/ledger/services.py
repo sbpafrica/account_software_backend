@@ -24,6 +24,48 @@ class LedgerService:
         return account
 
     @staticmethod
+
+    @transaction.atomic
+    def account_update(*, account_id, name: str = None, account_type: str = None,
+                       currency: str = None, country_code: str = None,
+                       is_active: bool = None, description: str = None) -> Account:
+        account = Account.objects.select_for_update().get(id=account_id)
+        if name is not None:
+            account.name = name.strip()
+        if account_type is not None:
+            account.account_type = account_type
+        if currency is not None:
+            account.currency = currency
+        if country_code is not None:
+            account.country_code = country_code
+        if is_active is not None:
+            account.is_active = is_active
+        if description is not None:
+            account.description = description
+        account.save()
+        CacheManager.delete_pattern("fms:accounts:")
+        return account
+
+    @staticmethod
+    @transaction.atomic
+    def account_delete(*, account_id) -> None:
+        account = Account.objects.get(id=account_id)
+        if account.journal_lines.exists():
+            raise ValidationError(f"Cannot delete account '{account.code}' because it has journal entries.")
+        account.delete()
+        CacheManager.delete_pattern("fms:accounts:")
+
+    @staticmethod
+    @transaction.atomic
+    def journal_entry_delete(*, entry_id) -> None:
+        entry = JournalEntry.objects.get(id=entry_id)
+        if entry.status == JournalEntryStatus.POSTED:
+            raise ValidationError("Posted journal entries cannot be deleted. Use reverse instead.")
+        entry.delete()
+        CacheManager.invalidate_ledger()
+
+
+    @staticmethod
     @transaction.atomic
     def post_journal_entry(*, entry_number: str, posting_date, description: str,
                            source_module: str, source_ref: str, user, lines_data: list) -> JournalEntry:

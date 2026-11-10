@@ -59,7 +59,7 @@ class TestJWTAuthentication:
         }, format="json")
 
         assert response.status_code == status.HTTP_200_OK
-        data = response.data
+        data = response.data["data"]
         assert "access" in data
         assert "refresh" in data
         assert "token" in data
@@ -79,7 +79,7 @@ class TestJWTAuthentication:
             "email": "accountant@sbp-africa.com",
             "password": "UserPassword123!"
         }, format="json")
-        refresh_token = login_res.data["refresh"]
+        refresh_token = login_res.data["data"]["refresh"]
 
         refresh_res = api_client.post(reverse("token-refresh"), {
             "refresh": refresh_token
@@ -93,14 +93,14 @@ class TestJWTAuthentication:
             "email": "accountant@sbp-africa.com",
             "password": "UserPassword123!"
         }, format="json")
-        access_token = login_res.data["access"]
+        access_token = login_res.data["data"]["access"]
 
         # Request with Bearer header
         api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
         me_res = api_client.get(reverse("user-me"))
 
         assert me_res.status_code == status.HTTP_200_OK
-        assert me_res.data["user"]["email"] == "accountant@sbp-africa.com"
+        assert me_res.data["data"]["user"]["email"] == "accountant@sbp-africa.com"
 
 
 @pytest.mark.django_db

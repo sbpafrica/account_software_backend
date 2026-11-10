@@ -24,6 +24,15 @@ def apply_dict_filters(
         if value is None or value == '':
             continue
 
+        if isinstance(value, str):
+            val_clean = value.strip()
+            if val_clean.lower() == 'true':
+                value = True
+            elif val_clean.lower() == 'false':
+                value = False
+            else:
+                value = val_clean
+
         if allowed_fields is not None:
             base_field = key.split('__')[0]
             if base_field not in allowed_fields and key not in allowed_fields:

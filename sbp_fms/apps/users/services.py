@@ -187,9 +187,38 @@ class UserService:
 
     @staticmethod
     @transaction.atomic
+    def user_update(*, user_id, first_name: str = None, last_name: str = None,
+                    role = None, assigned_country: str = None, is_active: bool = None) -> User:
+        user = User.objects.select_for_update().get(id=user_id)
+        if first_name is not None:
+            user.first_name = first_name.strip()
+        if last_name is not None:
+            user.last_name = last_name.strip()
+        if role is not None:
+            user.role = UserService._resolve_role(role)
+        if assigned_country is not None:
+            user.assigned_country = assigned_country.strip().upper() if assigned_country else None
+        if is_active is not None:
+            user.is_active = is_active
+        user.save()
+        CacheManager.invalidate_users()
+        return user
+
+    @staticmethod
+    @transaction.atomic
+    def user_delete(*, user_id) -> None:
+        user = User.objects.get(id=user_id)
+        if user.is_superuser:
+            raise ValidationError("Superuser accounts cannot be permanently deleted.")
+        user.delete()
+        CacheManager.invalidate_users()
+
+    @staticmethod
+    @transaction.atomic
     def user_deactivate(*, user_id) -> User:
         user = User.objects.select_for_update().get(id=user_id)
         user.is_active = False
         user.save(update_fields=['is_active', 'updated_at'])
         CacheManager.invalidate_users()
         return user
+
