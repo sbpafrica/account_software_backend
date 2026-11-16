@@ -1,0 +1,132 @@
+name: SBP-FMS CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  # -------------------------------------------------------------
+  # 1. CI / TESTING STAGE
+  # -------------------------------------------------------------
+  test:
+    name: Run Unit & Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install uv Package Manager
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install Dependencies
+        run: |
+          uv sync
+
+      - name: Run Pytest Suite
+        env:
+          DEBUG: "1"
+          SECRET_KEY: "ci-test-secret-key-at-least-50-characters-long-sbp-fms-2026"
+          ALLOWED_HOSTS: "localhost,127.0.0.1"
+          DATABASE_URL: "sqlite:///ci_test_db.sqlite3"
+        run: |
+          PYTHONPATH=sbp_fms uv run pytest sbp_fms
+
+      - name: Validate OpenAPI 3.0 Schema
+        env:
+          DEBUG: "1"
+          SECRET_KEY: "ci-test-secret-key-at-least-50-characters-long-sbp-fms-2026"
+        run: |
+          PYTHONPATH=sbp_fms uv run python sbp_fms/manage.py spectacular --file sbp_fms/schema.yml --validate
+
+  # -------------------------------------------------------------
+  # 2. CD / SSH PASSWORD DEPLOYMENT STAGE
+  # -------------------------------------------------------------
+  deploy:
+    name: Deploy to Production via SSH (Password Auth)
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Execute Remote Deployment via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            echo "==> Deploying SBP-FMS Backend on $(hostname)..."
+            
+            # Target project directory on remote server
+            DEPLOY_PATH="${{ secrets.DEPLOY_PATH || '/home/sbpafrica/sbp_fms_django_backend' }}"
+            REPO_URL="https://github.com/${{ github.repository }}.git"
+
+            # Check if project directory already exists and is a git repository
+            if [ ! -d "$DEPLOY_PATH/.git" ]; then
+              echo "==> Project not found at $DEPLOY_PATH. Cloning fresh copy..."
+              mkdir -p "$(dirname "$DEPLOY_PATH")"
+              
+              # If directory exists but not git repo, back it up or remove empty dir
+              if [ -d "$DEPLOY_PATH" ]; then
+                rm -rf "$DEPLOY_PATH"
+              fi
+              
+              # Clone repository using GitHub token authentication
+              git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "$DEPLOY_PATH"
+              cd "$DEPLOY_PATH"
+            else
+              cd "$DEPLOY_PATH"
+              echo "==> Pulling latest changes from Git..."
+              git fetch origin main || git fetch origin master
+              git reset --hard origin/main || git reset --hard origin/master
+            fi
+
+            # Ensure uv is installed
+            if ! command -v uv &> /dev/null; then
+              echo "==> Installing uv package manager..."
+              curl -LsSf https://astral.sh/uv/install.sh | sh
+              source $HOME/.local/bin/env 2>/dev/null || export PATH="$HOME/.local/bin:$PATH"
+            fi
+
+            # Sync Python virtual environment dependencies
+            echo "==> Syncing dependencies..."
+            uv sync --frozen || uv sync
+
+            # Run database migrations
+            echo "==> Running database migrations..."
+            PYTHONPATH=sbp_fms uv run python sbp_fms/manage.py migrate --noinput
+
+            # Collect static files for Nginx
+            echo "==> Collecting static assets..."
+            PYTHONPATH=sbp_fms uv run python sbp_fms/manage.py collectstatic --noinput
+
+            # Restart backend services (Systemd or Docker)
+            if [ -f "/etc/systemd/system/sbp-fms.service" ]; then
+              echo "==> Reloading Systemd services..."
+              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl daemon-reload
+              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl restart sbp-fms sbp-fms-celery sbp-fms-celery-beat
+              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl reload nginx
+            elif [ -f "sbp_fms/docker-compose.yml" ] && command -v docker &> /dev/null && docker info &> /dev/null; then
+              echo "==> Restarting Docker containers..."
+              cd sbp_fms && docker compose build api celery_worker celery_beat && docker compose up -d
+            else
+              echo "==> First time setup: running server setup script..."
+              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S bash deploy/scripts/setup_server.sh
+            fi
+
+            echo "==> Deployment completed successfully on $(date)!"

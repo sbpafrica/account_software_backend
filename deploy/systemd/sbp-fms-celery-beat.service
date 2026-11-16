@@ -1,0 +1,17 @@
+[Unit]
+Description=SBP-FMS Celery Beat Scheduled Tasks
+After=network.target redis.service sbp-fms-celery.service
+
+[Service]
+Type=forking
+User=sbpafrica
+Group=sbpafrica
+WorkingDirectory=/home/sbpafrica/sbp_fms_django_backend/sbp_fms
+EnvironmentFile=/home/sbpafrica/sbp_fms_django_backend/.env
+ExecStart=/bin/sh -c 'PYTHONPATH=/home/sbpafrica/sbp_fms_django_backend/sbp_fms /home/sbpafrica/.local/bin/uv run celery -A config beat --loglevel=INFO --logfile=/home/sbpafrica/sbp_fms_django_backend/logs/celery_beat.log --pidfile=/home/sbpafrica/sbp_fms_django_backend/logs/celery_beat.pid --detach'
+ExecStop=/bin/sh -c '/bin/kill -s TERM $(cat /home/sbpafrica/sbp_fms_django_backend/logs/celery_beat.pid)'
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,27 @@
+[Unit]
+Description=SBP-FMS Django Gunicorn Application Server
+After=network.target postgresql.service redis.service
+
+[Service]
+Type=notify
+User=sbpafrica
+Group=sbpafrica
+WorkingDirectory=/home/sbpafrica/sbp_fms_django_backend/sbp_fms
+EnvironmentFile=/home/sbpafrica/sbp_fms_django_backend/.env
+ExecStart=/home/sbpafrica/.local/bin/uv run gunicorn \
+    --workers 4 \
+    --threads 2 \
+    --bind 127.0.0.1:8080 \
+    --timeout 120 \
+    --access-logfile /home/sbpafrica/sbp_fms_django_backend/logs/gunicorn_access.log \
+    --error-logfile /home/sbpafrica/sbp_fms_django_backend/logs/gunicorn_error.log \
+    config.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=30
+PrivateTmp=true
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
