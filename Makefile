@@ -1,0 +1,162 @@
+# ==============================================================================
+# SBP-FMS (Financial Management System) Makefile
+# ==============================================================================
+
+SHELL := /bin/bash
+PYTHON := uv run python
+MANAGE := PYTHONPATH=sbp_fms $(PYTHON) sbp_fms/manage.py
+PYTEST := PYTHONPATH=sbp_fms uv run pytest sbp_fms
+
+.PHONY: help install dev migrate makemigrations superuser shell test test-fast test-cov \
+        validate-schema run gunicorn celery celery-beat collectstatic \
+        infra-up infra-down infra-logs dev-docker-up dev-docker-down \
+        deploy-local clean
+
+# ------------------------------------------------------------------------------
+# 1. HELP & DISCOVERY
+# ------------------------------------------------------------------------------
+help:
+	@echo "========================================================================"
+	@echo " SBP-FMS Backend Management Commands"
+	@echo "========================================================================"
+	@echo " Setup & Dependencies:"
+	@echo "   make install            Sync all dependencies using uv"
+	@echo ""
+	@echo " Database & Migrations:"
+	@echo "   make migrate            Apply database migrations"
+	@echo "   make makemigrations     Generate new database migrations"
+	@echo "   make superuser          Create a new Django superuser"
+	@echo ""
+	@echo " Development Server & Workers:"
+	@echo "   make dev                Run local Django development server (port 8000)"
+	@echo "   make gunicorn           Run production Gunicorn server (port 8080)"
+	@echo "   make celery             Start Celery worker process"
+	@echo "   make celery-beat        Start Celery Beat scheduler process"
+	@echo "   make shell              Open Django interactive shell"
+	@echo "   make collectstatic      Collect static assets into staticfiles/"
+	@echo ""
+	@echo " Testing & Quality:"
+	@echo "   make test               Run full pytest test suite (SQLite in-memory)"
+	@echo "   make test-fast          Run pytest with fail-fast (-x)"
+	@echo "   make validate-schema    Validate OpenAPI 3.0 schema generation"
+	@echo ""
+	@echo " Docker Infrastructure:"
+	@echo "   make infra-up           Start Production PostgreSQL 16 (port 5434) & Redis (port 6379)"
+	@echo "   make infra-down         Stop Production PostgreSQL & Redis containers"
+	@echo "   make infra-logs         View logs from PostgreSQL & Redis containers"
+	@echo "   make dev-docker-up      Start Full Local Dev Stack with Docker"
+	@echo "   make dev-docker-down    Stop Full Local Dev Stack"
+	@echo ""
+	@echo " Deployment & Maintenance:"
+	@echo "   make deploy-local       Execute deploy_production.sh script locally on server"
+	@echo "   make clean              Clean up Python bytecode, pytest cache, and artifacts"
+	@echo "========================================================================"
+
+# ------------------------------------------------------------------------------
+# 2. DEPENDENCY MANAGEMENT
+# ------------------------------------------------------------------------------
+install:
+	@echo "==> Syncing dependencies with uv..."
+	uv sync
+
+# ------------------------------------------------------------------------------
+# 3. DATABASE & DJANGO MANAGEMENT
+# ------------------------------------------------------------------------------
+migrate:
+	@echo "==> Applying database migrations..."
+	$(MANAGE) migrate --noinput
+
+makemigrations:
+	@echo "==> Generating database migrations..."
+	$(MANAGE) makemigrations
+
+superuser:
+	@echo "==> Creating superuser..."
+	$(MANAGE) createsuperuser
+
+shell:
+	@echo "==> Opening Django shell..."
+	$(MANAGE) shell
+
+collectstatic:
+	@echo "==> Collecting static assets..."
+	$(MANAGE) collectstatic --noinput
+
+# ------------------------------------------------------------------------------
+# 4. RUNNING APPLICATION SERVICES
+# ------------------------------------------------------------------------------
+dev:
+	@echo "==> Starting local development server at http://127.0.0.1:8000..."
+	$(MANAGE) runserver 0.0.0.0:8000
+
+gunicorn:
+	@echo "==> Starting Gunicorn application server on 127.0.0.1:8080..."
+	cd sbp_fms && uv run gunicorn --workers 4 --threads 2 --bind 127.0.0.1:8080 --timeout 120 config.wsgi:application
+
+celery:
+	@echo "==> Starting Celery worker..."
+	cd sbp_fms && uv run celery -A config worker --loglevel=INFO
+
+celery-beat:
+	@echo "==> Starting Celery Beat scheduler..."
+	cd sbp_fms && uv run celery -A config beat --loglevel=INFO
+
+# ------------------------------------------------------------------------------
+# 5. TESTING & QUALITY ASSURANCE
+# ------------------------------------------------------------------------------
+test:
+	@echo "==> Running Pytest test suite (in-memory SQLite)..."
+	DEBUG=1 \
+	SECRET_KEY="ci-test-secret-key-at-least-50-characters-long-sbp-fms-2026" \
+	ALLOWED_HOSTS="localhost,127.0.0.1" \
+	DATABASE_URL="sqlite://:memory:" \
+	$(PYTEST)
+
+test-fast:
+	@echo "==> Running Pytest with fail-fast (-x)..."
+	DEBUG=1 \
+	SECRET_KEY="ci-test-secret-key-at-least-50-characters-long-sbp-fms-2026" \
+	ALLOWED_HOSTS="localhost,127.0.0.1" \
+	DATABASE_URL="sqlite://:memory:" \
+	$(PYTEST) -x
+
+validate-schema:
+	@echo "==> Validating OpenAPI 3.0 Spectacular schema..."
+	DEBUG=1 \
+	SECRET_KEY="ci-test-secret-key-at-least-50-characters-long-sbp-fms-2026" \
+	$(MANAGE) spectacular --file sbp_fms/schema.yml --validate
+
+# ------------------------------------------------------------------------------
+# 6. DOCKER INFRASTRUCTURE
+# ------------------------------------------------------------------------------
+infra-up:
+	@echo "==> Starting Production Docker PostgreSQL (port 5434) and Redis..."
+	docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+infra-down:
+	@echo "==> Stopping Production Docker containers..."
+	docker compose -f docker-compose.prod.yml down
+
+infra-logs:
+	docker compose -f docker-compose.prod.yml logs -f
+
+dev-docker-up:
+	@echo "==> Starting full development Docker stack..."
+	cd sbp_fms && docker compose up -d --build
+
+dev-docker-down:
+	@echo "==> Stopping development Docker stack..."
+	cd sbp_fms && docker compose down
+
+# ------------------------------------------------------------------------------
+# 7. DEPLOYMENT & MAINTENANCE
+# ------------------------------------------------------------------------------
+deploy-local:
+	@echo "==> Running server deployment script..."
+	bash deploy/scripts/deploy_production.sh
+
+clean:
+	@echo "==> Cleaning cache and temporary files..."
+	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	rm -rf .coverage htmlcov .tox .nox 2>/dev/null || true
+	@echo "[+] Cleaned successfully."
