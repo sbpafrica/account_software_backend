@@ -69,85 +69,11 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script_stop: true
           command_timeout: 30m
-          debug: true
           script: |
-            set -ex
-            echo "==> Deploying SBP-FMS Backend on $(hostname)..."
-            
-            # Ensure PATH includes standard binary locations and local user bins
-            export PATH="$HOME/.local/bin:$PATH:/usr/local/bin:/usr/bin:/bin"
-
-            # Target project directory on remote server
-            DEPLOY_PATH="/home/sbpafrica/sbp_fms_django_backend"
-            mkdir -p "$DEPLOY_PATH"
-            cd "$DEPLOY_PATH"
-
-            # Configure git safe directory
-            git config --global --add safe.directory "$DEPLOY_PATH" || true
-
-            # Check if project directory is a valid git repository
-            if [ ! -d ".git" ]; then
-              echo "==> Project not found at $DEPLOY_PATH. Cloning fresh copy..."
-              cd ..
-              rm -rf "$DEPLOY_PATH"
-              git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "$DEPLOY_PATH"
-              cd "$DEPLOY_PATH"
-            else
-              echo "==> Updating Git remote origin with current deployment token..."
-              git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-              echo "==> Pulling latest changes from Git..."
-              git fetch origin main || git fetch origin master
-              git reset --hard origin/main || git reset --hard origin/master
-            fi
-
-            # Ensure .env exists on server
-            if [ ! -f ".env" ]; then
-              if [ -f ".env.production" ]; then
-                cp .env.production .env
-              elif [ -f ".env.example" ]; then
-                cp .env.example .env
-              fi
-            fi
-
-            # Ensure Docker PostgreSQL and Redis are up
-            if [ -f "docker-compose.prod.yml" ] && command -v docker &> /dev/null; then
-              echo "==> Ensuring PostgreSQL & Redis Docker containers are running..."
-              # Remove any legacy standalone or conflicting containers from prior runs
-              docker rm -f sbp_fms_redis sbp_fms_db 2>/dev/null || true
-              docker compose -f docker-compose.prod.yml up -d --remove-orphans
-              sleep 4
-            fi
-
-            # Ensure uv is installed
-            if ! command -v uv &> /dev/null; then
-              echo "==> Installing uv package manager..."
-              curl -LsSf https://astral.sh/uv/install.sh | sh
-              source $HOME/.local/bin/env 2>/dev/null || export PATH="$HOME/.local/bin:$PATH"
-            fi
-
-            # Sync Python virtual environment dependencies
-            echo "==> Syncing dependencies..."
-            uv sync --frozen || uv sync
-
-            # Run database migrations
-            echo "==> Running database migrations..."
-            PYTHONPATH=sbp_fms uv run python sbp_fms/manage.py migrate --noinput
-
-            # Collect static files for Nginx
-            echo "==> Collecting static assets..."
-            PYTHONPATH=sbp_fms uv run python sbp_fms/manage.py collectstatic --noinput
-
-            # Configure and restart backend services (Nginx & Systemd)
-            if [ ! -f "/etc/systemd/system/sbp-fms.service" ]; then
-              echo "==> First time setup: running server setup script..."
-              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S bash deploy/scripts/setup_server.sh
-            else
-              echo "==> Updating Systemd services & Nginx configuration..."
-              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S cp deploy/systemd/sbp-fms*.service /etc/systemd/system/
-              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S cp deploy/nginx/fms.sbpafrica.group.conf /etc/nginx/sites-available/
-              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl daemon-reload
-              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl restart sbp-fms sbp-fms-celery sbp-fms-celery-beat
-              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S nginx -t && echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl reload nginx
-            fi
-
-            echo "==> Deployment completed successfully on $(date)!"
+            test -d /home/sbpafrica/sbp_fms_django_backend/.git || git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" /home/sbpafrica/sbp_fms_django_backend
+            cd /home/sbpafrica/sbp_fms_django_backend
+            git config --global --add safe.directory /home/sbpafrica/sbp_fms_django_backend
+            git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+            git fetch origin main || git fetch origin master
+            git reset --hard origin/main || git reset --hard origin/master
+            SSH_PASSWORD="${{ secrets.SSH_PASSWORD }}" bash deploy/scripts/deploy_production.sh
