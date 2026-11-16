@@ -71,24 +71,28 @@ jobs:
           command_timeout: 30m
           debug: true
           script: |
+            set -ex
             echo "==> Deploying SBP-FMS Backend on $(hostname)..."
             
             # Ensure PATH includes standard binary locations and local user bins
             export PATH="$HOME/.local/bin:$PATH:/usr/local/bin:/usr/bin:/bin"
 
             # Target project directory on remote server
-            DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
-            DEPLOY_PATH="${DEPLOY_PATH:-/home/sbpafrica/sbp_fms_django_backend}"
+            DEPLOY_PATH="/home/sbpafrica/sbp_fms_django_backend"
+            mkdir -p "$DEPLOY_PATH"
+            cd "$DEPLOY_PATH"
 
-            # Check if project directory already exists and is a git repository
-            if [ ! -d "$DEPLOY_PATH/.git" ]; then
+            # Configure git safe directory
+            git config --global --add safe.directory "$DEPLOY_PATH" || true
+
+            # Check if project directory is a valid git repository
+            if [ ! -d ".git" ]; then
               echo "==> Project not found at $DEPLOY_PATH. Cloning fresh copy..."
-              mkdir -p "$(dirname "$DEPLOY_PATH")"
-              rm -rf "$DEPLOY_PATH" 2>/dev/null || true
+              cd ..
+              rm -rf "$DEPLOY_PATH"
               git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "$DEPLOY_PATH"
               cd "$DEPLOY_PATH"
             else
-              cd "$DEPLOY_PATH"
               echo "==> Updating Git remote origin with current deployment token..."
               git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
               echo "==> Pulling latest changes from Git..."
