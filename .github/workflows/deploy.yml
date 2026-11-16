@@ -108,8 +108,10 @@ jobs:
             # Ensure Docker PostgreSQL and Redis are up
             if [ -f "docker-compose.prod.yml" ] && command -v docker &> /dev/null; then
               echo "==> Ensuring PostgreSQL & Redis Docker containers are running..."
-              docker compose -f docker-compose.prod.yml up -d
-              sleep 3
+              # Remove any legacy standalone or conflicting containers from prior runs
+              docker rm -f sbp_fms_redis sbp_fms_db 2>/dev/null || true
+              docker compose -f docker-compose.prod.yml up -d --remove-orphans
+              sleep 4
             fi
 
             # Ensure uv is installed
@@ -131,18 +133,17 @@ jobs:
             echo "==> Collecting static assets..."
             PYTHONPATH=sbp_fms uv run python sbp_fms/manage.py collectstatic --noinput
 
-            # Restart backend services (Systemd or Docker)
-            if [ -f "/etc/systemd/system/sbp-fms.service" ]; then
-              echo "==> Reloading Systemd services..."
-              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl daemon-reload
-              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl restart sbp-fms sbp-fms-celery sbp-fms-celery-beat
-              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl reload nginx
-            elif [ -f "sbp_fms/docker-compose.yml" ] && command -v docker &> /dev/null && docker info &> /dev/null; then
-              echo "==> Restarting Docker containers..."
-              cd sbp_fms && docker compose build api celery_worker celery_beat && docker compose up -d
-            else
+            # Configure and restart backend services (Nginx & Systemd)
+            if [ ! -f "/etc/systemd/system/sbp-fms.service" ]; then
               echo "==> First time setup: running server setup script..."
               echo "${{ secrets.SSH_PASSWORD }}" | sudo -S bash deploy/scripts/setup_server.sh
+            else
+              echo "==> Updating Systemd services & Nginx configuration..."
+              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S cp deploy/systemd/sbp-fms*.service /etc/systemd/system/
+              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S cp deploy/nginx/fms.sbpafrica.group.conf /etc/nginx/sites-available/
+              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl daemon-reload
+              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl restart sbp-fms sbp-fms-celery sbp-fms-celery-beat
+              echo "${{ secrets.SSH_PASSWORD }}" | sudo -S nginx -t && echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl reload nginx
             fi
 
             echo "==> Deployment completed successfully on $(date)!"

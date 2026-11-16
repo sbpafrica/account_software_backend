@@ -54,7 +54,9 @@ fi
 echo "[3/8] Starting Docker PostgreSQL and Redis containers..."
 if command -v docker &> /dev/null && [ -f "$PROJECT_DIR/docker-compose.prod.yml" ]; then
   cd "$PROJECT_DIR"
-  docker compose -f docker-compose.prod.yml up -d
+  # Clean up legacy standalone or conflicting containers
+  docker rm -f sbp_fms_redis sbp_fms_db 2>/dev/null || true
+  docker compose -f docker-compose.prod.yml up -d --remove-orphans
   echo "[+] Docker PostgreSQL & Redis are running."
   # Wait for postgres to be healthy
   sleep 4

@@ -1,15 +1,16 @@
 [Unit]
 Description=SBP-FMS Celery Background Tasks Worker
-After=network.target redis.service sbp-fms.service
+After=network.target sbp-fms.service
 
 [Service]
 Type=forking
 User=sbpafrica
 Group=sbpafrica
 WorkingDirectory=/home/sbpafrica/sbp_fms_django_backend/sbp_fms
+Environment="PATH=/home/sbpafrica/.local/bin:/usr/local/bin:/usr/bin:/bin"
 EnvironmentFile=/home/sbpafrica/sbp_fms_django_backend/.env
-ExecStart=/bin/sh -c 'PYTHONPATH=/home/sbpafrica/sbp_fms_django_backend/sbp_fms /home/sbpafrica/.local/bin/uv run celery -A config worker --loglevel=INFO --logfile=/home/sbpafrica/sbp_fms_django_backend/logs/celery_worker.log --pidfile=/home/sbpafrica/sbp_fms_django_backend/logs/celery_worker.pid --detach'
-ExecStop=/bin/sh -c '/bin/kill -s TERM $(cat /home/sbpafrica/sbp_fms_django_backend/logs/celery_worker.pid)'
+ExecStart=/bin/sh -c 'PYTHONPATH=/home/sbpafrica/sbp_fms_django_backend/sbp_fms PATH="/home/sbpafrica/.local/bin:$PATH" uv run celery -A config worker --loglevel=INFO --logfile=/home/sbpafrica/sbp_fms_django_backend/logs/celery_worker.log --pidfile=/home/sbpafrica/sbp_fms_django_backend/logs/celery_worker.pid --detach'
+ExecStop=/bin/sh -c '/bin/kill -s TERM $$(cat /home/sbpafrica/sbp_fms_django_backend/logs/celery_worker.pid 2>/dev/null) 2>/dev/null || true'
 Restart=always
 RestartSec=10
 

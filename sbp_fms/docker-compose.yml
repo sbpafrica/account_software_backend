@@ -1,15 +1,15 @@
-version: '3.8'
+name: sbp_fms_dev
 
 services:
   db:
     image: postgres:16-alpine
-    container_name: sbp_fms_db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: sbp_fms
       POSTGRES_USER: sbp_user
       POSTGRES_PASSWORD: sbp_secure_password_2026
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,13 +20,12 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: sbp_fms_redis
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
 
   api:
     build: .
-    container_name: sbp_fms_api
     command: gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 120 config.wsgi:application
     volumes:
       - .:/app
@@ -49,7 +48,6 @@ services:
 
   celery_worker:
     build: .
-    container_name: sbp_fms_celery_worker
     command: celery -A config worker --loglevel=info
     volumes:
       - .:/app
@@ -62,7 +60,6 @@ services:
 
   celery_beat:
     build: .
-    container_name: sbp_fms_celery_beat
     command: celery -A config beat --loglevel=info
     volumes:
       - .:/app

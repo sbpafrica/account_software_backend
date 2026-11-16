@@ -1,4 +1,4 @@
-version: '3.8'
+name: sbp_fms_infra
 
 services:
   # ============================================================================
@@ -7,7 +7,6 @@ services:
   # ============================================================================
   db:
     image: postgres:16-alpine
-    container_name: sbp_fms_db
     restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-sbp_fms}
@@ -29,7 +28,6 @@ services:
   # ============================================================================
   redis:
     image: redis:7-alpine
-    container_name: sbp_fms_redis
     restart: always
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
