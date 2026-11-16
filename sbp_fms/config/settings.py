@@ -1,10 +1,12 @@
 import os
+import sys
 from pathlib import Path
 from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DEBUG = os.environ.get('DEBUG', '1').strip().lower() in ('1', 'true', 'yes', 'on')
+IS_TESTING = 'pytest' in sys.modules or 'test' in sys.argv or os.environ.get('TESTING') == '1'
 
 SECRET_KEY = os.environ.get('SECRET_KEY')
 if not SECRET_KEY:
@@ -149,7 +151,7 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 WHITENOISE_AUTOREFRESH = DEBUG
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# REST Framework with Custom Pagination, Exception Handling & JWT Authentication
+# REST Framework with Custom Pagination, Exception Handling, Throttling & JWT Authentication
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -159,6 +161,20 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'apps.common.throttling.SbpAnonRateThrottle',
+        'apps.common.throttling.SbpUserRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '10000/minute' if IS_TESTING else os.environ.get('THROTTLE_ANON_RATE', '120/minute'),
+        'user': '10000/minute' if IS_TESTING else os.environ.get('THROTTLE_USER_RATE', '1200/minute'),
+        'auth_burst': '10000/minute' if IS_TESTING else os.environ.get('THROTTLE_AUTH_BURST_RATE', '10/minute'),
+        'auth_sustained': '10000/hour' if IS_TESTING else os.environ.get('THROTTLE_AUTH_SUSTAINED_RATE', '100/hour'),
+        'registration': '10000/hour' if IS_TESTING else os.environ.get('THROTTLE_REGISTRATION_RATE', '20/hour'),
+        'financial_mutation': '10000/minute' if IS_TESTING else os.environ.get('THROTTLE_FINANCIAL_RATE', '120/minute'),
+        'tenant': '10000/minute' if IS_TESTING else os.environ.get('THROTTLE_TENANT_RATE', '5000/minute'),
+    },
+    'NUM_PROXIES': 1,
     'DEFAULT_PAGINATION_CLASS': 'apps.common.pagination.CustomPageNumberPagination',
     'EXCEPTION_HANDLER': 'apps.common.exception_handlers.custom_exception_handler',
     'PAGE_SIZE': 50,

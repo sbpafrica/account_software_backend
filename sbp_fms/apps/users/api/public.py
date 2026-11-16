@@ -3,6 +3,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
 from drf_spectacular.utils import extend_schema
 from apps.common.responses import api_success
+from apps.common.throttling import AuthBurstRateThrottle, AuthSustainedRateThrottle
 from apps.users.services import UserService
 from apps.users.serializers import (
     UserLoginInputSerializer, UserOutputSerializer,
@@ -14,8 +15,10 @@ class UserLoginPublicApi(APIView):
     """
     [PUBLIC API]:
     Authenticates user and returns JWT token pair (access & refresh) alongside user role and permissions.
+    Protected against brute-force and credential stuffing by burst and sustained rate throttles.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [AuthBurstRateThrottle, AuthSustainedRateThrottle]
 
     @extend_schema(
         tags=['Users - Authentication'],

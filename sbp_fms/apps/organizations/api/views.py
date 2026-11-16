@@ -6,6 +6,10 @@ from django.core.exceptions import ValidationError, PermissionDenied
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from apps.common.responses import api_success, api_error
 from apps.common.idempotency import idempotent_endpoint
+from apps.common.throttling import (
+    RegistrationRateThrottle, AuthBurstRateThrottle,
+    FinancialMutationRateThrottle, SbpUserRateThrottle
+)
 from apps.users.serializers import UserOutputSerializer
 from apps.users.permissions import IsSuperUser
 from apps.organizations.models import (
@@ -44,8 +48,10 @@ class OrganizationRegisterPublicApi(APIView):
     [PUBLIC API]:
     Self-service registration endpoint for new B2B SaaS customer organizations.
     Creates the organization tenant, owner account, default company profile, and returns scoped JWT tokens.
+    Protected against registration abuse by registration and auth burst rate throttles.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [RegistrationRateThrottle, AuthBurstRateThrottle]
 
     @extend_schema(
         tags=['Organizations & Multi-Tenancy'],
@@ -553,9 +559,10 @@ class BillingInitializeApi(APIView):
     """
     [AUTHENTICATED TENANT API]:
     Initializes a Paystack subscription checkout for the active organization.
-    Secured with strict financial idempotency ('Idempotency-Key' header).
+    Secured with strict financial idempotency ('Idempotency-Key' header) and financial mutation throttling.
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [FinancialMutationRateThrottle, SbpUserRateThrottle]
 
     @extend_schema(
         tags=['Subscription Plans & Billing'],
@@ -714,8 +721,10 @@ class PaystackWebhookPublicApi(APIView):
     [PUBLIC WEBHOOK API]:
     Ingests asynchronous event webhooks from Paystack.
     Enforces HMAC-SHA512 cryptographic verification and strict once-only idempotency via PaymentWebhookLog.
+    Exempt from standard rate limiting to guarantee delivery of critical billing events.
     """
     permission_classes = [AllowAny]
+    throttle_classes = []
 
     @extend_schema(
         tags=['Subscription Plans & Billing'],
