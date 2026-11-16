@@ -68,12 +68,12 @@ class OrganizationService:
         # Resolve dynamic plan if available
         dyn_plan = SubscriptionPlan.objects.filter(models.Q(code=plan) | models.Q(name__iexact=plan)).first()
 
-        # Calculate subscription trial period (14 days for trial)
+        # Calculate subscription trial period (30 days for free trial)
         plan_expires_at = None
         if dyn_plan and dyn_plan.trial_period_days > 0:
             plan_expires_at = timezone.now() + datetime.timedelta(days=dyn_plan.trial_period_days)
         elif plan == SubscriptionPlanTier.TRIAL:
-            plan_expires_at = timezone.now() + datetime.timedelta(days=14)
+            plan_expires_at = timezone.now() + datetime.timedelta(days=30)
 
         # 1. Create Organization
         organization = Organization.objects.create(

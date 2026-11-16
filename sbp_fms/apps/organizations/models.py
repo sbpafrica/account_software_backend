@@ -13,7 +13,7 @@ class BillingInterval(models.TextChoices):
 
 
 class SubscriptionPlanTier(models.TextChoices):
-    TRIAL = 'TRIAL', '14-Day Free Trial'
+    TRIAL = 'TRIAL', '30-Day Free Trial'
     STARTER = 'STARTER', 'Starter Tier (Single Entity)'
     GROWTH = 'GROWTH', 'Growth Tier (Multi-Entity / Multi-Currency)'
     ENTERPRISE = 'ENTERPRISE', 'Enterprise Tier (Unlimited Subsidiaries & Custom Rules)'
@@ -85,6 +85,31 @@ class Organization(BaseModel):
 
     def __str__(self):
         return f"{self.name} ({self.slug}) - [{self.plan}]"
+
+    @property
+    def is_subscription_active(self) -> bool:
+        """
+        Evaluates whether the organization has an active, valid subscription or trial.
+        Returns False if the 30-day trial or paid plan has expired.
+        """
+        if not self.is_active:
+            return False
+        if self.plan_expires_at:
+            from django.utils import timezone
+            return self.plan_expires_at > timezone.now()
+        return self.plan != SubscriptionPlanTier.TRIAL
+
+    @property
+    def is_trial(self) -> bool:
+        return self.plan == SubscriptionPlanTier.TRIAL
+
+    @property
+    def days_remaining(self) -> int:
+        if not self.plan_expires_at:
+            return 0
+        from django.utils import timezone
+        diff = self.plan_expires_at - timezone.now()
+        return max(0, diff.days)
 
     def save(self, *args, **kwargs):
         if not self.slug:

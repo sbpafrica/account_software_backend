@@ -57,12 +57,16 @@ class OrganizationOutputSerializer(serializers.ModelSerializer):
     Detailed output representation of an Organization tenant.
     """
     subscription_plan = SubscriptionPlanOutputSerializer(read_only=True)
+    is_subscription_active = serializers.BooleanField(read_only=True)
+    is_trial = serializers.BooleanField(read_only=True)
+    days_remaining = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Organization
         fields = [
             'id', 'name', 'slug', 'subdomain',
             'plan', 'subscription_plan', 'plan_expires_at', 'base_currency',
+            'is_subscription_active', 'is_trial', 'days_remaining',
             'paystack_customer_code', 'paystack_subscription_code',
             'is_active', 'billing_email', 'settings',
             'created_at', 'updated_at'

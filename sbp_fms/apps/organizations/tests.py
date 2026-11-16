@@ -1,4 +1,6 @@
+import datetime
 import pytest
+from django.utils import timezone
 from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
@@ -209,3 +211,32 @@ class TestOrganizationEndpoints:
         assert profiles_org2[0].company_name == "Beta Subsidiary"
 
         clear_current_organization()
+
+    def test_30_days_trial_expiration_enforcement(self, api_client, saas_owner):
+        org = saas_owner['org']
+        tokens = saas_owner['tokens']
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+        # 1. While within 30-day trial: active and operations work
+        assert org.is_subscription_active is True
+        assert org.is_trial is True
+        assert org.days_remaining >= 28
+
+        # 2. Expire the trial artificially
+        org.plan_expires_at = timezone.now() - datetime.timedelta(days=1)
+        org.save()
+        assert org.is_subscription_active is False
+        assert org.days_remaining == 0
+
+        # 3. Financial operations locked with HTTP 402 Payment Required
+        res = api_client.get(f"/api/v1/ledger/accounts/?organization_id={org.id}")
+        assert res.status_code == 402
+        data = res.json()
+        assert data['code'] == 'SUBSCRIPTION_EXPIRED'
+
+        # 4. Billing, plans, and tenant profile endpoints remain unlocked so they can subscribe
+        res_me = api_client.get("/api/v1/organizations/me/")
+        assert res_me.status_code == 200
+
+        res_plans = api_client.get("/api/v1/organizations/plans/")
+        assert res_plans.status_code == 200
