@@ -41,10 +41,23 @@ chown -R "$USER_NAME:$USER_NAME" "$PROJECT_DIR"
 
 # Ensure .env file exists
 if [ ! -f "$PROJECT_DIR/.env" ]; then
-  if [ -f "$PROJECT_DIR/.env.example" ]; then
+  if [ -f "$PROJECT_DIR/.env.production" ]; then
+    echo "[!] .env not found. Copying .env.production to .env..."
+    sudo -u "$USER_NAME" cp "$PROJECT_DIR/.env.production" "$PROJECT_DIR/.env"
+  elif [ -f "$PROJECT_DIR/.env.example" ]; then
     echo "[!] .env not found. Copying .env.example to .env..."
     sudo -u "$USER_NAME" cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
   fi
+fi
+
+# Start Docker PostgreSQL & Redis infrastructure containers
+echo "[3/8] Starting Docker PostgreSQL and Redis containers..."
+if command -v docker &> /dev/null && [ -f "$PROJECT_DIR/docker-compose.prod.yml" ]; then
+  cd "$PROJECT_DIR"
+  docker compose -f docker-compose.prod.yml up -d
+  echo "[+] Docker PostgreSQL & Redis are running."
+  # Wait for postgres to be healthy
+  sleep 4
 fi
 
 # 3. Configure Nginx

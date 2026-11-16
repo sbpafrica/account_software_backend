@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # POSTGRESQL 16 PRODUCTION DATABASE
+  # Port 5434 bound to 127.0.0.1 to prevent port conflicts with 5432 / 5433
+  # ============================================================================
+  db:
+    image: postgres:16-alpine
+    container_name: sbp_fms_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sbp_fms}
+      POSTGRES_USER: ${POSTGRES_USER:-sbp_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sbp_secure_prod_password_2026!}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - sbp_fms_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sbp_user} -d ${POSTGRES_DB:-sbp_fms}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # REDIS CACHE & CELERY BROKER
+  # Bound to 127.0.0.1:6379
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: sbp_fms_redis
+    restart: always
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - sbp_fms_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  sbp_fms_postgres_data:
+  sbp_fms_redis_data:

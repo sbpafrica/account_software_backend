@@ -90,18 +90,34 @@ DATABASES = {
     }
 }
 
-if 'DATABASE_URL' in os.environ:
-    import urllib.parse
-    url = urllib.parse.urlparse(os.environ['DATABASE_URL'])
-    DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': urllib.parse.unquote(url.path[1:]),
-        'USER': urllib.parse.unquote(url.username or ''),
-        'PASSWORD': urllib.parse.unquote(url.password or ''),
-        'HOST': url.hostname,
-        'PORT': url.port or 5432,
-        'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '600')),
-    }
+if 'DATABASE_URL' in os.environ and os.environ['DATABASE_URL'].strip():
+    db_url_str = os.environ['DATABASE_URL'].strip()
+    if db_url_str.startswith('sqlite:'):
+        # Handle SQLite URL format: sqlite:///path/to/db.sqlite3 or sqlite://:memory:
+        import re
+        sqlite_path = re.sub(r'^sqlite:(///?)?', '', db_url_str)
+        if not sqlite_path or sqlite_path == ':memory:':
+            DATABASES['default'] = {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': ':memory:',
+            }
+        else:
+            DATABASES['default'] = {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / sqlite_path if not os.path.isabs(sqlite_path) else sqlite_path,
+            }
+    else:
+        import urllib.parse
+        url = urllib.parse.urlparse(db_url_str)
+        DATABASES['default'] = {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': urllib.parse.unquote(url.path[1:]),
+            'USER': urllib.parse.unquote(url.username or ''),
+            'PASSWORD': urllib.parse.unquote(url.password or ''),
+            'HOST': url.hostname or '',
+            'PORT': url.port or 5432,
+            'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '600')),
+        }
 
 # Multi-Tier Caching: Redis default, LocMem fallback
 CACHES = {

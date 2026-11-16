@@ -36,7 +36,7 @@ jobs:
           DEBUG: "1"
           SECRET_KEY: "ci-test-secret-key-at-least-50-characters-long-sbp-fms-2026"
           ALLOWED_HOSTS: "localhost,127.0.0.1"
-          DATABASE_URL: "sqlite:///ci_test_db.sqlite3"
+          DATABASE_URL: "sqlite://:memory:"
         run: |
           PYTHONPATH=sbp_fms uv run pytest sbp_fms
 
@@ -94,6 +94,22 @@ jobs:
               echo "==> Pulling latest changes from Git..."
               git fetch origin main || git fetch origin master
               git reset --hard origin/main || git reset --hard origin/master
+            fi
+
+            # Ensure .env exists on server
+            if [ ! -f ".env" ]; then
+              if [ -f ".env.production" ]; then
+                cp .env.production .env
+              elif [ -f ".env.example" ]; then
+                cp .env.example .env
+              fi
+            fi
+
+            # Ensure Docker PostgreSQL and Redis are up
+            if [ -f "docker-compose.prod.yml" ] && command -v docker &> /dev/null; then
+              echo "==> Ensuring PostgreSQL & Redis Docker containers are running..."
+              docker compose -f docker-compose.prod.yml up -d
+              sleep 3
             fi
 
             # Ensure uv is installed
