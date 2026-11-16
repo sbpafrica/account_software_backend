@@ -69,28 +69,28 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script_stop: true
           command_timeout: 30m
+          debug: true
           script: |
             echo "==> Deploying SBP-FMS Backend on $(hostname)..."
             
+            # Ensure PATH includes standard binary locations and local user bins
+            export PATH="$HOME/.local/bin:$PATH:/usr/local/bin:/usr/bin:/bin"
+
             # Target project directory on remote server
-            DEPLOY_PATH="${{ secrets.DEPLOY_PATH || '/home/sbpafrica/sbp_fms_django_backend' }}"
-            REPO_URL="https://github.com/${{ github.repository }}.git"
+            DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
+            DEPLOY_PATH="${DEPLOY_PATH:-/home/sbpafrica/sbp_fms_django_backend}"
 
             # Check if project directory already exists and is a git repository
             if [ ! -d "$DEPLOY_PATH/.git" ]; then
               echo "==> Project not found at $DEPLOY_PATH. Cloning fresh copy..."
               mkdir -p "$(dirname "$DEPLOY_PATH")"
-              
-              # If directory exists but not git repo, back it up or remove empty dir
-              if [ -d "$DEPLOY_PATH" ]; then
-                rm -rf "$DEPLOY_PATH"
-              fi
-              
-              # Clone repository using GitHub token authentication
+              rm -rf "$DEPLOY_PATH" 2>/dev/null || true
               git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "$DEPLOY_PATH"
               cd "$DEPLOY_PATH"
             else
               cd "$DEPLOY_PATH"
+              echo "==> Updating Git remote origin with current deployment token..."
+              git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
               echo "==> Pulling latest changes from Git..."
               git fetch origin main || git fetch origin master
               git reset --hard origin/main || git reset --hard origin/master
