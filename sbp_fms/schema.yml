@@ -2611,6 +2611,54 @@ paths:
           description: ''
         '404':
           description: Organization not found
+    put:
+      operationId: organization_detail_put
+      description: Replaces organization settings and details.
+      summary: Update organization (Full Replacement)
+      parameters:
+      - in: path
+        name: organization_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organizations & Multi-Tenancy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationUpdateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrganizationUpdateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrganizationUpdateInputRequest'
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/OrganizationOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '403':
+          description: Insufficient permissions
     patch:
       operationId: organization_detail_update
       description: Updates organization legal name, reporting currency, billing email,
@@ -2660,6 +2708,112 @@ paths:
           description: ''
         '403':
           description: Insufficient permissions
+    delete:
+      operationId: organization_delete
+      description: Permanently deletes the organization tenant. Restricted to Organization
+        Owner or Platform Superadmin.
+      summary: Delete organization
+      parameters:
+      - in: path
+        name: organization_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organizations & Multi-Tenancy
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          description: Organization deleted successfully
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Organization not found
+  /api/v1/organizations/{organization_id}/deactivate/:
+    post:
+      operationId: organization_deactivate
+      description: Deactivates an organization tenant (sets is_active=False). Restricted
+        to Organization Owner or Platform Superadmin.
+      summary: Deactivate organization
+      parameters:
+      - in: path
+        name: organization_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organizations & Multi-Tenancy
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/OrganizationOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Organization not found
+  /api/v1/organizations/{organization_id}/reactivate/:
+    post:
+      operationId: organization_reactivate
+      description: Reactivates a deactivated organization tenant (sets is_active=True).
+        Restricted to Organization Owner or Platform Superadmin.
+      summary: Reactivate organization
+      parameters:
+      - in: path
+        name: organization_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organizations & Multi-Tenancy
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/OrganizationOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Organization not found
   /api/v1/organizations/accept-invite/:
     post:
       operationId: organization_accept_invite
@@ -2704,6 +2858,40 @@ paths:
           description: ''
         '400':
           description: Expired or invalid invitation
+  /api/v1/organizations/admin/list/:
+    get:
+      operationId: organization_admin_list
+      description: Returns all customer organizations across the platform. Supports
+        filtering by is_active, plan, and search query. Restricted to Platform Superadmins.
+      summary: List all organizations (Superadmin)
+      tags:
+      - Organizations & Multi-Tenancy
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrganizationOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '403':
+          description: Insufficient permissions
   /api/v1/organizations/admin/plans/:
     get:
       operationId: admin_billing_plans_list
@@ -14499,6 +14687,15 @@ components:
           type: string
           readOnly: true
           description: Default base reporting currency (e.g. GHS, USD, NGN, KES).
+        is_subscription_active:
+          type: boolean
+          readOnly: true
+        is_trial:
+          type: boolean
+          readOnly: true
+        days_remaining:
+          type: integer
+          readOnly: true
         paystack_customer_code:
           type: string
           readOnly: true
@@ -14529,8 +14726,11 @@ components:
       - base_currency
       - billing_email
       - created_at
+      - days_remaining
       - id
       - is_active
+      - is_subscription_active
+      - is_trial
       - name
       - paystack_customer_code
       - paystack_subscription_code
@@ -14670,6 +14870,26 @@ components:
       - organization
       - refresh
       - role
+    OrganizationUpdateInputRequest:
+      type: object
+      description: Payload for updating organization settings and branding.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        base_currency:
+          type: string
+          minLength: 1
+          maxLength: 3
+        billing_email:
+          type: string
+          format: email
+          minLength: 1
+        settings:
+          type: object
+          additionalProperties: {}
+          description: Tenant-specific customizations and UI branding.
     POLineInputRequest:
       type: object
       properties:
@@ -17288,7 +17508,7 @@ components:
       - CUSTOM
       type: string
       description: |-
-        * `TRIAL` - 14-Day Free Trial
+        * `TRIAL` - 30-Day Free Trial
         * `STARTER` - Starter Tier (Single Entity)
         * `GROWTH` - Growth Tier (Multi-Entity / Multi-Currency)
         * `ENTERPRISE` - Enterprise Tier (Unlimited Subsidiaries & Custom Rules)
@@ -18271,3 +18491,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+tags:
+- name: Organizations & Multi-Tenancy
+  description: Customer tenant registration (with 30-day free trial), tenant lifecycle
+    management (PUT/PATCH update, delete, deactivate, reactivate), team memberships,
+    and superadmin tenant overview.
+- name: Subscription Plans & Billing
+  description: SaaS pricing tiers, subscription plans, Paystack payment initialization
+    & verification, and webhooks.

@@ -190,6 +190,26 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
     'SCHEMA_PATH_PREFIX': r'/api/v[0-9]',
     'COMPONENT_SPLIT_REQUEST': True,
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': False,
+        'filter': True,  # Enables the live search/filter input box at the top of Swagger UI
+        'docExpansion': 'list',  # Automatically expands tags so all endpoints are immediately visible
+        'defaultModelsExpandDepth': 1,
+        'defaultModelExpandDepth': 1,
+        'displayRequestDuration': True,
+    },
+    'TAGS': [
+        {
+            'name': 'Organizations & Multi-Tenancy',
+            'description': 'Customer tenant registration (with 30-day free trial), tenant lifecycle management (PUT/PATCH update, delete, deactivate, reactivate), team memberships, and superadmin tenant overview.'
+        },
+        {
+            'name': 'Subscription Plans & Billing',
+            'description': 'SaaS pricing tiers, subscription plans, Paystack payment initialization & verification, and webhooks.'
+        },
+    ],
     'POSTPROCESSING_HOOKS': [
         'drf_spectacular.hooks.postprocess_schema_enums',
         'apps.common.responses.api_response_postprocessing_hook',

@@ -298,6 +298,117 @@ class OrganizationService:
         CacheManager.invalidate_organizations()
         return org
 
+    @staticmethod
+    @transaction.atomic
+    def deactivate_organization(*, organization_id, user: User) -> Organization:
+        """
+        Deactivates an organization tenant (is_active=False).
+        Only organization OWNER or platform Superusers are permitted.
+        """
+        membership = OrganizationMembership.objects.filter(
+            organization_id=organization_id,
+            user=user,
+            role=OrganizationRole.OWNER
+        ).first()
+
+        if not membership and not user.is_superuser:
+            raise PermissionDenied("Only the organization Owner or Platform Superadmin can deactivate an organization.")
+
+        try:
+            org = Organization.objects.select_for_update().get(id=organization_id)
+        except Organization.DoesNotExist:
+            raise ValidationError("Organization not found.")
+
+        org.is_active = False
+        org.save(update_fields=['is_active', 'updated_at'])
+        CacheManager.invalidate_organizations()
+        logger.info("Organization '%s' (%s) was deactivated by %s", org.name, org.id, user.email)
+        return org
+
+    @staticmethod
+    @transaction.atomic
+    def reactivate_organization(*, organization_id, user: User) -> Organization:
+        """
+        Reactivates a deactivated organization tenant (is_active=True).
+        Only organization OWNER or platform Superusers are permitted.
+        """
+        membership = OrganizationMembership.objects.filter(
+            organization_id=organization_id,
+            user=user,
+            role=OrganizationRole.OWNER
+        ).first()
+
+        if not membership and not user.is_superuser:
+            raise PermissionDenied("Only the organization Owner or Platform Superadmin can reactivate an organization.")
+
+        try:
+            org = Organization.objects.select_for_update().get(id=organization_id)
+        except Organization.DoesNotExist:
+            raise ValidationError("Organization not found.")
+
+        org.is_active = True
+        org.save(update_fields=['is_active', 'updated_at'])
+        CacheManager.invalidate_organizations()
+        logger.info("Organization '%s' (%s) was reactivated by %s", org.name, org.id, user.email)
+        return org
+
+    @staticmethod
+    @transaction.atomic
+    def delete_organization(*, organization_id, user: User) -> dict:
+        """
+        Permanently deletes an organization tenant.
+        Strictly restricted to organization OWNER or platform Superusers.
+        """
+        membership = OrganizationMembership.objects.filter(
+            organization_id=organization_id,
+            user=user,
+            role=OrganizationRole.OWNER
+        ).first()
+
+        if not membership and not user.is_superuser:
+            raise PermissionDenied("Only the organization Owner or Platform Superadmin can delete an organization.")
+
+        try:
+            org = Organization.objects.get(id=organization_id)
+        except Organization.DoesNotExist:
+            raise ValidationError("Organization not found.")
+
+        org_name = org.name
+        org_id_str = str(org.id)
+        org.delete()
+        CacheManager.invalidate_organizations()
+        logger.warning("Organization '%s' (%s) was PERMANENTLY deleted by %s", org_name, org_id_str, user.email)
+        return {
+            'id': org_id_str,
+            'name': org_name,
+            'deleted': True
+        }
+
+    @staticmethod
+    def list_all_organizations_admin(*, user: User, is_active: bool = None, plan: str = None, search: str = None):
+        """
+        Superadmin platform overview: returns all customer organizations with optional filtering.
+        """
+        if not user.is_superuser:
+            user_role = user.role.name if getattr(user, 'role', None) else None
+            if user_role != 'SUPER_ADMIN':
+                raise PermissionDenied("Only platform Superusers or Super Admins can list all organizations.")
+
+        qs = Organization.objects.all().select_related('subscription_plan').order_by('-created_at')
+        if is_active is not None:
+            qs = qs.filter(is_active=is_active)
+        if plan:
+            qs = qs.filter(plan__iexact=plan.strip())
+        if search:
+            search_term = search.strip()
+            qs = qs.filter(
+                models.Q(name__icontains=search_term) |
+                models.Q(slug__icontains=search_term) |
+                models.Q(subdomain__icontains=search_term) |
+                models.Q(billing_email__icontains=search_term)
+            )
+        return qs
+
 
 class SubscriptionPlanService:
     """

@@ -267,6 +267,143 @@ class OrganizationDetailApi(APIView):
         data = OrganizationOutputSerializer(org).data
         return api_success(data=data, message="Organization settings updated successfully.")
 
+    @extend_schema(
+        tags=['Organizations & Multi-Tenancy'],
+        operation_id='organization_detail_put',
+        summary='Update organization (Full Replacement)',
+        description='Replaces organization settings and details.',
+        request=OrganizationUpdateInputSerializer,
+        responses={
+            status.HTTP_200_OK: OrganizationOutputSerializer,
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(description="Insufficient permissions"),
+        }
+    )
+    def put(self, request, organization_id):
+        return self.patch(request, organization_id)
+
+    @extend_schema(
+        tags=['Organizations & Multi-Tenancy'],
+        operation_id='organization_delete',
+        summary='Delete organization',
+        description='Permanently deletes the organization tenant. Restricted to Organization Owner or Platform Superadmin.',
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(description="Organization deleted successfully"),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(description="Insufficient permissions"),
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(description="Organization not found"),
+        }
+    )
+    def delete(self, request, organization_id):
+        try:
+            result = OrganizationService.delete_organization(
+                organization_id=organization_id,
+                user=request.user
+            )
+        except PermissionDenied as e:
+            return api_error(message=str(e), status_code=status.HTTP_403_FORBIDDEN)
+        except ValidationError as e:
+            return api_error(message=str(e), status_code=status.HTTP_404_NOT_FOUND)
+        return api_success(data=result, message=f"Organization '{result['name']}' was successfully deleted.")
+
+
+class OrganizationDeactivateApi(APIView):
+    """
+    [AUTHENTICATED API]:
+    Deactivates an organization tenant, locking access for its members.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['Organizations & Multi-Tenancy'],
+        operation_id='organization_deactivate',
+        summary='Deactivate organization',
+        description='Deactivates an organization tenant (sets is_active=False). Restricted to Organization Owner or Platform Superadmin.',
+        request=None,
+        responses={
+            status.HTTP_200_OK: OrganizationOutputSerializer,
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(description="Insufficient permissions"),
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(description="Organization not found"),
+        }
+    )
+    def post(self, request, organization_id):
+        try:
+            org = OrganizationService.deactivate_organization(
+                organization_id=organization_id,
+                user=request.user
+            )
+        except PermissionDenied as e:
+            return api_error(message=str(e), status_code=status.HTTP_403_FORBIDDEN)
+        except ValidationError as e:
+            return api_error(message=str(e), status_code=status.HTTP_404_NOT_FOUND)
+        data = OrganizationOutputSerializer(org).data
+        return api_success(data=data, message=f"Organization '{org.name}' has been deactivated.")
+
+
+class OrganizationReactivateApi(APIView):
+    """
+    [AUTHENTICATED API]:
+    Reactivates a deactivated organization tenant.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['Organizations & Multi-Tenancy'],
+        operation_id='organization_reactivate',
+        summary='Reactivate organization',
+        description='Reactivates a deactivated organization tenant (sets is_active=True). Restricted to Organization Owner or Platform Superadmin.',
+        request=None,
+        responses={
+            status.HTTP_200_OK: OrganizationOutputSerializer,
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(description="Insufficient permissions"),
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(description="Organization not found"),
+        }
+    )
+    def post(self, request, organization_id):
+        try:
+            org = OrganizationService.reactivate_organization(
+                organization_id=organization_id,
+                user=request.user
+            )
+        except PermissionDenied as e:
+            return api_error(message=str(e), status_code=status.HTTP_403_FORBIDDEN)
+        except ValidationError as e:
+            return api_error(message=str(e), status_code=status.HTTP_404_NOT_FOUND)
+        data = OrganizationOutputSerializer(org).data
+        return api_success(data=data, message=f"Organization '{org.name}' has been reactivated.")
+
+
+class OrganizationAdminListApi(APIView):
+    """
+    [SUPERADMIN API]:
+    Lists all organizations on the platform with search and filter capabilities.
+    """
+    permission_classes = [IsAuthenticated, IsSuperUser]
+
+    @extend_schema(
+        tags=['Organizations & Multi-Tenancy'],
+        operation_id='organization_admin_list',
+        summary='List all organizations (Superadmin)',
+        description='Returns all customer organizations across the platform. Supports filtering by is_active, plan, and search query. Restricted to Platform Superadmins.',
+        responses={
+            status.HTTP_200_OK: OrganizationOutputSerializer(many=True),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(description="Insufficient permissions"),
+        }
+    )
+    def get(self, request):
+        is_active = request.query_params.get('is_active')
+        if is_active is not None:
+            is_active = is_active.lower() in ('true', '1', 'yes')
+        plan = request.query_params.get('plan')
+        search = request.query_params.get('search')
+
+        qs = OrganizationService.list_all_organizations_admin(
+            user=request.user,
+            is_active=is_active,
+            plan=plan,
+            search=search
+        )
+        data = OrganizationOutputSerializer(qs, many=True).data
+        return api_success(data=data)
+
 
 # ============================================================================
 # SUBSCRIPTION PLANS & PAYSTACK BILLING APIS

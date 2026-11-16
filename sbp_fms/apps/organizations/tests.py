@@ -240,3 +240,64 @@ class TestOrganizationEndpoints:
 
         res_plans = api_client.get("/api/v1/organizations/plans/")
         assert res_plans.status_code == 200
+
+    def test_organization_update_put_and_patch(self, api_client, saas_owner):
+        org = saas_owner['org']
+        tokens = saas_owner['tokens']
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+        # PATCH update
+        url = reverse('organization-detail', kwargs={'organization_id': org.id})
+        res_patch = api_client.patch(url, {'name': 'Acme Global Updated'}, format='json')
+        assert res_patch.status_code == status.HTTP_200_OK
+        assert res_patch.json()['data']['name'] == 'Acme Global Updated'
+
+        # PUT full update
+        res_put = api_client.put(url, {'name': 'Acme Enterprise', 'base_currency': 'USD'}, format='json')
+        assert res_put.status_code == status.HTTP_200_OK
+        assert res_put.json()['data']['name'] == 'Acme Enterprise'
+        assert res_put.json()['data']['base_currency'] == 'USD'
+
+    def test_organization_deactivate_and_reactivate(self, api_client, saas_owner):
+        org = saas_owner['org']
+        tokens = saas_owner['tokens']
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+        deactivate_url = reverse('organization-deactivate', kwargs={'organization_id': org.id})
+        res_deact = api_client.post(deactivate_url)
+        assert res_deact.status_code == status.HTTP_200_OK
+        assert res_deact.json()['data']['is_active'] is False
+
+        reactivate_url = reverse('organization-reactivate', kwargs={'organization_id': org.id})
+        res_react = api_client.post(reactivate_url)
+        assert res_react.status_code == status.HTTP_200_OK
+        assert res_react.json()['data']['is_active'] is True
+
+    def test_organization_delete(self, api_client, saas_owner):
+        org = saas_owner['org']
+        tokens = saas_owner['tokens']
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+        url = reverse('organization-detail', kwargs={'organization_id': org.id})
+        res = api_client.delete(url)
+        assert res.status_code == status.HTTP_200_OK
+        assert res.json()['data']['deleted'] is True
+        assert not Organization.objects.filter(id=org.id).exists()
+
+    def test_superadmin_list_organizations(self, api_client, saas_owner):
+        admin_user = User.objects.create_superuser(
+            email="platform-superadmin@sbpafrica.group",
+            password="AdminSuperPassword123!",
+            first_name="Platform",
+            last_name="Superadmin"
+        )
+        from rest_framework_simplejwt.tokens import RefreshToken
+        admin_token = str(RefreshToken.for_user(admin_user).access_token)
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+
+        url = reverse('organization-admin-list')
+        res = api_client.get(url)
+        assert res.status_code == status.HTTP_200_OK
+        data = res.json()['data']
+        assert len(data) >= 1
+

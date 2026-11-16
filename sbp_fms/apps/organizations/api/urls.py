@@ -6,6 +6,9 @@ from .views import (
     OrganizationInviteApi,
     OrganizationAcceptInviteApi,
     OrganizationDetailApi,
+    OrganizationDeactivateApi,
+    OrganizationReactivateApi,
+    OrganizationAdminListApi,
     SubscriptionPlanListPublicApi,
     SubscriptionPlanListCreateAdminApi,
     SubscriptionPlanDetailAdminApi,
@@ -16,8 +19,11 @@ from .views import (
 )
 
 urlpatterns = [
-    # Public self-service SaaS onboarding
+    # Public self-service SaaS onboarding (Registration with 30-Day Free Trial)
     path('register/', OrganizationRegisterPublicApi.as_view(), name='organization-register-public'),
+
+    # Superadmin Platform Organization Management
+    path('admin/list/', OrganizationAdminListApi.as_view(), name='organization-admin-list'),
 
     # User's tenant memberships & tenant switcher
     path('me/', OrganizationMeListApi.as_view(), name='organization-me-list'),
@@ -38,6 +44,9 @@ urlpatterns = [
     path('billing/transactions/', BillingTransactionsListApi.as_view(), name='billing-transactions-list'),
     path('billing/webhook/', PaystackWebhookPublicApi.as_view(), name='billing-paystack-webhook'),
 
-    # Tenant metadata & settings
+    # Tenant lifecycle & metadata (Retrieve, Update PUT/PATCH, Delete, Deactivate, Reactivate)
+    path('<uuid:organization_id>/deactivate/', OrganizationDeactivateApi.as_view(), name='organization-deactivate'),
+    path('<uuid:organization_id>/reactivate/', OrganizationReactivateApi.as_view(), name='organization-reactivate'),
     path('<uuid:organization_id>/', OrganizationDetailApi.as_view(), name='organization-detail'),
 ]
+
