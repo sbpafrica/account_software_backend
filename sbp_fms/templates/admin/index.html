@@ -6,20 +6,25 @@
 {% block bodyclass %}{{ block.super }} dashboard{% endblock %}
 
 {% block content_title %}
-    <div class="d-flex justify-content-between align-items-center w-100">
-        <div>
-            <h1 class="m-0 text-dark font-weight-bold" style="font-size: 1.75rem;">
-                <i class="fas fa-chart-line text-primary mr-2"></i>Executive Financial Dashboard
-            </h1>
-            <p class="text-muted mb-0 small">Real-time multi-tenant telemetry, subscription analytics, and domain activity.</p>
-        </div>
-        <div>
-            <a href="/api/docs/" target="_blank" class="btn btn-sm btn-primary shadow-sm mr-2">
-                <i class="fas fa-book-open mr-1"></i> Swagger API Docs
-            </a>
-            <a href="/health/" target="_blank" class="btn btn-sm btn-outline-success shadow-sm">
-                <i class="fas fa-heartbeat mr-1"></i> API Health
-            </a>
+    <!-- High-Contrast Executive Header Banner (Visible in both Dark & Light modes) -->
+    <div class="p-4 mb-3 rounded shadow-sm w-100" style="background: linear-gradient(135deg, #102a43 0%, #243b53 100%); color: #ffffff; border: 1px solid rgba(255,255,255,0.1);">
+        <div class="d-flex justify-content-between align-items-center flex-wrap">
+            <div>
+                <h1 class="m-0 font-weight-bold text-white" style="font-size: 1.75rem; letter-spacing: -0.5px;">
+                    <i class="fas fa-chart-line text-warning mr-2"></i>Executive Financial Dashboard
+                </h1>
+                <p class="mb-0 text-white-50 mt-1" style="font-size: 0.95rem;">
+                    Real-time multi-tenant telemetry, subscription analytics, and domain activity.
+                </p>
+            </div>
+            <div class="mt-3 mt-md-0">
+                <a href="/api/docs/" target="_blank" class="btn btn-sm btn-light font-weight-bold shadow-sm mr-2 px-3 py-2" style="color: #102a43; border-radius: 6px;">
+                    <i class="fas fa-book-open mr-1 text-primary"></i> Swagger API Docs
+                </a>
+                <a href="/health/" target="_blank" class="btn btn-sm btn-outline-light font-weight-bold shadow-sm px-3 py-2" style="border-radius: 6px;">
+                    <i class="fas fa-heartbeat mr-1 text-success"></i> API Health
+                </a>
+            </div>
         </div>
     </div>
 {% endblock %}
@@ -37,18 +42,18 @@
         <div class="row">
             <!-- Total Organizations -->
             <div class="col-xl-3 col-md-6 col-12 mb-3">
-                <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #3498db !important; background: #fff;">
+                <div class="card border-0 shadow-sm h-100" style="border-radius: 8px; border-left: 5px solid #007bff !important; background: #ffffff;">
                     <div class="card-body p-3">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <div class="text-uppercase font-weight-bold text-muted small">Total Tenants</div>
-                                <div class="h3 font-weight-bold mb-0 text-dark">{{ m.total_orgs }}</div>
-                                <div class="small mt-1 text-success font-weight-bold">
+                                <div class="text-uppercase font-weight-bold small" style="color: #627d98 !important; font-size: 0.75rem; letter-spacing: 0.5px;">TOTAL TENANTS</div>
+                                <div class="h2 font-weight-bold mb-0" style="color: #102a43 !important;">{{ m.total_orgs }}</div>
+                                <div class="small mt-1 font-weight-bold" style="color: #15803d !important;">
                                     <i class="fas fa-check-circle"></i> {{ m.active_orgs }} Active &bull;
-                                    <span class="text-info">{{ m.inhouse_orgs }} In-House</span>
+                                    <span style="color: #0284c7 !important;">{{ m.inhouse_orgs }} In-House</span>
                                 </div>
                             </div>
-                            <div class="p-3 bg-light rounded-circle text-primary">
+                            <div class="p-3 rounded-circle" style="background: rgba(0, 123, 255, 0.1); color: #007bff;">
                                 <i class="fas fa-building fa-2x"></i>
                             </div>
                         </div>
@@ -58,18 +63,18 @@
 
             <!-- Total Users -->
             <div class="col-xl-3 col-md-6 col-12 mb-3">
-                <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #2ecc71 !important; background: #fff;">
+                <div class="card border-0 shadow-sm h-100" style="border-radius: 8px; border-left: 5px solid #16a34a !important; background: #ffffff;">
                     <div class="card-body p-3">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <div class="text-uppercase font-weight-bold text-muted small">Platform Users</div>
-                                <div class="h3 font-weight-bold mb-0 text-dark">{{ m.total_users }}</div>
-                                <div class="small mt-1 text-muted">
-                                    <span class="text-success font-weight-bold">{{ m.active_users }} Active</span> &bull;
-                                    <span class="text-secondary">{{ m.staff_users }} Staff</span>
+                                <div class="text-uppercase font-weight-bold small" style="color: #627d98 !important; font-size: 0.75rem; letter-spacing: 0.5px;">PLATFORM USERS</div>
+                                <div class="h2 font-weight-bold mb-0" style="color: #102a43 !important;">{{ m.total_users }}</div>
+                                <div class="small mt-1 font-weight-bold">
+                                    <span style="color: #15803d !important;">{{ m.active_users }} Active</span> &bull;
+                                    <span style="color: #64748b !important;">{{ m.staff_users }} Staff</span>
                                 </div>
                             </div>
-                            <div class="p-3 bg-light rounded-circle text-success">
+                            <div class="p-3 rounded-circle" style="background: rgba(22, 163, 74, 0.1) !important; color: #16a34a !important;">
                                 <i class="fas fa-users fa-2x"></i>
                             </div>
                         </div>
@@ -79,18 +84,18 @@
 
             <!-- Subscriptions & Plans -->
             <div class="col-xl-3 col-md-6 col-12 mb-3">
-                <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #f39c12 !important; background: #fff;">
-                    <div class="card-body p-3">
+                <div class="card border-0 shadow-sm h-100" style="border-radius: 8px; border-left: 5px solid #d97706 !important; background: #ffffff !important;">
+                    <div class="card-body p-3" style="background: #ffffff !important;">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <div class="text-uppercase font-weight-bold text-muted small">Subscriptions</div>
-                                <div class="h3 font-weight-bold mb-0 text-dark">{{ m.total_plans }} Plans</div>
-                                <div class="small mt-1 text-warning font-weight-bold">
+                                <div class="text-uppercase font-weight-bold small" style="color: #627d98 !important; font-size: 0.75rem; letter-spacing: 0.5px;">SUBSCRIPTIONS</div>
+                                <div class="h2 font-weight-bold mb-0" style="color: #102a43 !important;">{{ m.total_plans }} Plans</div>
+                                <div class="small mt-1 font-weight-bold" style="color: #b45309 !important;">
                                     <i class="fas fa-clock"></i> {{ m.trial_orgs }} on Trial &bull;
-                                    <span class="text-success">{{ m.paid_orgs }} Paid</span>
+                                    <span style="color: #15803d !important;">{{ m.paid_orgs }} Paid</span>
                                 </div>
                             </div>
-                            <div class="p-3 bg-light rounded-circle text-warning">
+                            <div class="p-3 rounded-circle" style="background: rgba(217, 119, 6, 0.1) !important; color: #d97706 !important;">
                                 <i class="fas fa-gem fa-2x"></i>
                             </div>
                         </div>
@@ -100,19 +105,19 @@
 
             <!-- System Health / Status -->
             <div class="col-xl-3 col-md-6 col-12 mb-3">
-                <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #9b59b6 !important; background: #fff;">
-                    <div class="card-body p-3">
+                <div class="card border-0 shadow-sm h-100" style="border-radius: 8px; border-left: 5px solid #7c3aed !important; background: #ffffff !important;">
+                    <div class="card-body p-3" style="background: #ffffff !important;">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <div class="text-uppercase font-weight-bold text-muted small">API & Engine</div>
-                                <div class="h3 font-weight-bold mb-0 text-success">
-                                    <i class="fas fa-check-circle text-success mr-1"></i>ONLINE
+                                <div class="text-uppercase font-weight-bold small" style="color: #627d98 !important; font-size: 0.75rem; letter-spacing: 0.5px;">API & ENGINE</div>
+                                <div class="h2 font-weight-bold mb-0" style="color: #15803d !important;">
+                                    <i class="fas fa-check-circle mr-1"></i>ONLINE
                                 </div>
-                                <div class="small mt-1 text-muted">
+                                <div class="small mt-1 font-weight-bold" style="color: #64748b !important;">
                                     v3.0.0 &bull; Celery Active
                                 </div>
                             </div>
-                            <div class="p-3 bg-light rounded-circle text-purple" style="color: #9b59b6;">
+                            <div class="p-3 rounded-circle" style="background: rgba(124, 58, 237, 0.1) !important; color: #7c3aed !important;">
                                 <i class="fas fa-server fa-2x"></i>
                             </div>
                         </div>
@@ -127,14 +132,14 @@
         <div class="row">
             <!-- Pie / Doughnut Chart: Tenant Tier Distribution -->
             <div class="col-lg-4 col-12 mb-3">
-                <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-white border-0 pb-0 pt-3">
-                        <h6 class="font-weight-bold text-dark m-0">
+                <div class="card shadow-sm border-0 h-100" style="background: #ffffff !important; border-radius: 8px; overflow: hidden;">
+                    <div class="card-header pb-2 pt-3" style="background: #ffffff !important; border-bottom: 1px solid #f1f5f9 !important;">
+                        <h6 class="font-weight-bold m-0" style="color: #0f172a !important; font-size: 1rem;">
                             <i class="fas fa-chart-pie text-info mr-2"></i>Tenants by Plan Tier
                         </h6>
-                        <small class="text-muted">Breakdown across subscription tiers & internal exemptions</small>
+                        <small style="color: #64748b !important; font-size: 0.8rem;">Breakdown across tiers & internal exemptions</small>
                     </div>
-                    <div class="card-body d-flex align-items-center justify-content-center p-3" style="min-height: 280px;">
+                    <div class="card-body d-flex align-items-center justify-content-center p-3" style="background: #ffffff !important; min-height: 280px;">
                         <canvas id="tierDoughnutChart" style="max-height: 250px; width: 100%;"></canvas>
                     </div>
                 </div>
@@ -142,14 +147,14 @@
 
             <!-- Line Chart: Platform Growth Over Time -->
             <div class="col-lg-4 col-12 mb-3">
-                <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-white border-0 pb-0 pt-3">
-                        <h6 class="font-weight-bold text-dark m-0">
+                <div class="card shadow-sm border-0 h-100" style="background: #ffffff !important; border-radius: 8px; overflow: hidden;">
+                    <div class="card-header pb-2 pt-3" style="background: #ffffff !important; border-bottom: 1px solid #f1f5f9 !important;">
+                        <h6 class="font-weight-bold m-0" style="color: #0f172a !important; font-size: 1rem;">
                             <i class="fas fa-chart-line text-primary mr-2"></i>Platform Growth Trends
                         </h6>
-                        <small class="text-muted">Cumulative growth of tenants & team members</small>
+                        <small style="color: #64748b !important; font-size: 0.8rem;">Cumulative tenants & team members</small>
                     </div>
-                    <div class="card-body p-3" style="min-height: 280px;">
+                    <div class="card-body p-3" style="background: #ffffff !important; min-height: 280px;">
                         <canvas id="growthLineChart" style="max-height: 250px; width: 100%;"></canvas>
                     </div>
                 </div>
@@ -157,14 +162,14 @@
 
             <!-- Bar Chart: Financial Modules & Platform Entities -->
             <div class="col-lg-4 col-12 mb-3">
-                <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-white border-0 pb-0 pt-3">
-                        <h6 class="font-weight-bold text-dark m-0">
+                <div class="card shadow-sm border-0 h-100" style="background: #ffffff !important; border-radius: 8px; overflow: hidden;">
+                    <div class="card-header pb-2 pt-3" style="background: #ffffff !important; border-bottom: 1px solid #f1f5f9 !important;">
+                        <h6 class="font-weight-bold m-0" style="color: #0f172a !important; font-size: 1rem;">
                             <i class="fas fa-cubes text-success mr-2"></i>Financial Domain Modules
                         </h6>
-                        <small class="text-muted">Entity volume across core financial micro-apps</small>
+                        <small style="color: #64748b !important; font-size: 0.8rem;">Entity volume across financial micro-apps</small>
                     </div>
-                    <div class="card-body p-3" style="min-height: 280px;">
+                    <div class="card-body p-3" style="background: #ffffff !important; min-height: 280px;">
                         <canvas id="moduleBarChart" style="max-height: 250px; width: 100%;"></canvas>
                     </div>
                 </div>
@@ -175,32 +180,32 @@
     <!-- 3. STANDARD JAZZMIN APPLICATION LIST & RECENT ACTIONS -->
     {% get_side_menu using="app_list" as dashboard_list %}
     <div class="col-lg-8 col-12">
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-white border-0 pt-3 pb-2">
-                <h6 class="font-weight-bold text-dark m-0">
+        <div class="card shadow-sm border-0 mb-4" style="background: #ffffff; border-radius: 8px; overflow: hidden;">
+            <div class="card-header pt-3 pb-2" style="background: #ffffff; border-bottom: 1px solid #f1f5f9;">
+                <h6 class="font-weight-bold m-0" style="color: #0f172a; font-size: 1rem;">
                     <i class="fas fa-th-large text-secondary mr-2"></i>Application Modules & Model Registry
                 </h6>
             </div>
-            <div class="card-body p-3">
+            <div class="card-body p-3" style="background: #ffffff;">
                 <div class="row">
                     {% for app in dashboard_list %}
                         <div class="col-md-6 col-12 mb-3">
-                            <div class="border rounded p-3 h-100 bg-light">
-                                <h6 class="font-weight-bold text-primary mb-2">
+                            <div class="border rounded p-3 h-100" style="background: #f8fafc; border-color: #e2e8f0 !important;">
+                                <h6 class="font-weight-bold mb-2" style="color: #1e40af;">
                                     <i class="fas fa-folder-open mr-1"></i> {{ app.name }}
                                 </h6>
                                 <ul class="list-unstyled mb-0 small">
                                     {% for model in app.models %}
-                                        <li class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                        <li class="d-flex justify-content-between align-items-center py-1 border-bottom" style="border-color: #e2e8f0 !important;">
                                             {% if model.url %}
-                                                <a href="{{ model.url }}" class="text-dark font-weight-500">
+                                                <a href="{{ model.url }}" class="font-weight-bold" style="color: #334155;">
                                                     <i class="fas fa-angle-right text-muted mr-1"></i>{{ model.name }}
                                                 </a>
                                             {% else %}
                                                 <span class="text-muted">{{ model.name }}</span>
                                             {% endif %}
                                             {% if model.add_url %}
-                                                <a href="{{ model.add_url }}" class="badge badge-primary text-white px-2 py-1">
+                                                <a href="{{ model.add_url }}" class="badge badge-primary text-white px-2 py-1" style="border-radius: 4px;">
                                                     <i class="fas fa-plus mr-1"></i>Add
                                                 </a>
                                             {% endif %}
@@ -218,33 +223,33 @@
     <!-- 4. SIDEBAR RECENT ACTIONS & SHORTCUTS -->
     <div class="col-lg-4 col-12">
         <!-- Quick Documentation & API Access -->
-        <div class="card shadow-sm border-0 mb-3">
-            <div class="card-header bg-white border-0 pt-3 pb-1">
-                <h6 class="font-weight-bold text-dark m-0">
+        <div class="card shadow-sm border-0 mb-3" style="background: #ffffff; border-radius: 8px;">
+            <div class="card-header pt-3 pb-1" style="background: #ffffff; border-bottom: 1px solid #f1f5f9;">
+                <h6 class="font-weight-bold m-0" style="color: #0f172a; font-size: 1rem;">
                     <i class="fas fa-external-link-alt text-info mr-2"></i>Quick Resources
                 </h6>
             </div>
-            <div class="card-body p-3">
-                <a href="/api/docs/" target="_blank" class="btn btn-outline-primary btn-block text-left mb-2">
+            <div class="card-body p-3" style="background: #ffffff;">
+                <a href="/api/docs/" target="_blank" class="btn btn-outline-primary btn-block text-left mb-2 font-weight-bold" style="border-radius: 6px;">
                     <i class="fas fa-book mr-2"></i>Interactive Swagger UI (/api/docs/)
                 </a>
-                <a href="/api/redoc/" target="_blank" class="btn btn-outline-secondary btn-block text-left mb-2">
+                <a href="/api/redoc/" target="_blank" class="btn btn-outline-secondary btn-block text-left mb-2 font-weight-bold" style="border-radius: 6px;">
                     <i class="fas fa-file-alt mr-2"></i>Redoc Schema View (/api/redoc/)
                 </a>
-                <a href="/health/" target="_blank" class="btn btn-outline-success btn-block text-left">
+                <a href="/health/" target="_blank" class="btn btn-outline-success btn-block text-left font-weight-bold" style="border-radius: 6px;">
                     <i class="fas fa-heartbeat mr-2"></i>API Health Check (/health/)
                 </a>
             </div>
         </div>
 
         <!-- Recent Actions -->
-        <div class="card shadow-sm border-0 mb-3">
-            <div class="card-header bg-white border-0 pt-3 pb-1">
-                <h6 class="font-weight-bold text-dark m-0">
+        <div class="card shadow-sm border-0 mb-3" style="background: #ffffff; border-radius: 8px;">
+            <div class="card-header pt-3 pb-1" style="background: #ffffff; border-bottom: 1px solid #f1f5f9;">
+                <h6 class="font-weight-bold m-0" style="color: #0f172a; font-size: 1rem;">
                     <i class="fas fa-history text-secondary mr-2"></i>{% trans 'Recent Actions' %}
                 </h6>
             </div>
-            <div class="card-body p-3">
+            <div class="card-body p-3" style="background: #ffffff;">
                 {% load log %}
                 {% get_admin_log 8 as admin_log for_user user %}
                 {% if not admin_log %}
@@ -252,11 +257,11 @@
                 {% else %}
                     <ul class="timeline list-unstyled mb-0 small">
                         {% for entry in admin_log %}
-                            <li class="border-bottom py-1">
+                            <li class="border-bottom py-1" style="border-color: #f1f5f9 !important;">
                                 <span class="badge {% if entry.is_addition %}badge-success{% elif entry.is_change %}badge-warning{% else %}badge-danger{% endif %} mr-1">
                                     {% if entry.is_addition %}+ Add{% elif entry.is_change %}~ Edit{% else %}- Del{% endif %}
                                 </span>
-                                <span class="font-weight-bold">{{ entry.object_repr }}</span>
+                                <span class="font-weight-bold" style="color: #1e293b;">{{ entry.object_repr }}</span>
                                 <div class="text-muted small">{{ entry.content_type }} &bull; {{ entry.action_time|date:"M d, H:i" }}</div>
                             </li>
                         {% endfor %}
@@ -270,15 +275,14 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // Palette styling
             const colors = {
-                primary: '#3498db',
-                success: '#2ecc71',
-                warning: '#f39c12',
-                danger: '#e74c3c',
-                purple: '#9b59b6',
-                gray: '#95a5a6',
-                navy: '#34495e',
+                primary: '#2563eb',
+                success: '#16a34a',
+                warning: '#d97706',
+                danger: '#dc2626',
+                purple: '#7c3aed',
+                gray: '#64748b',
+                navy: '#0f172a',
             };
 
             // 1. Doughnut / Pie Chart: Subscription Tiers
@@ -303,7 +307,11 @@
                         plugins: {
                             legend: {
                                 position: 'bottom',
-                                labels: { boxWidth: 12, font: { size: 11 } }
+                                labels: {
+                                    boxWidth: 12,
+                                    font: { size: 11, family: 'system-ui, -apple-system, sans-serif', weight: 'bold' },
+                                    color: '#334155'
+                                }
                             }
                         },
                         cutout: '65%'
@@ -326,7 +334,7 @@
                                 label: 'Tenants',
                                 data: orgGrowth,
                                 borderColor: colors.primary,
-                                backgroundColor: 'rgba(52, 152, 219, 0.15)',
+                                backgroundColor: 'rgba(37, 99, 235, 0.15)',
                                 fill: true,
                                 tension: 0.35,
                                 borderWidth: 2,
@@ -336,7 +344,7 @@
                                 label: 'Users',
                                 data: userGrowth,
                                 borderColor: colors.success,
-                                backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                                backgroundColor: 'rgba(22, 163, 74, 0.1)',
                                 fill: true,
                                 tension: 0.35,
                                 borderWidth: 2,
@@ -350,13 +358,22 @@
                         plugins: {
                             legend: {
                                 position: 'bottom',
-                                labels: { boxWidth: 12, font: { size: 11 } }
+                                labels: {
+                                    boxWidth: 12,
+                                    font: { size: 11, family: 'system-ui, -apple-system, sans-serif', weight: 'bold' },
+                                    color: '#334155'
+                                }
                             }
                         },
                         scales: {
                             y: {
                                 beginAtZero: true,
-                                ticks: { precision: 0 }
+                                ticks: { precision: 0, color: '#64748b' },
+                                grid: { color: '#f1f5f9' }
+                            },
+                            x: {
+                                ticks: { color: '#64748b' },
+                                grid: { color: '#f1f5f9' }
                             }
                         }
                     }
@@ -395,10 +412,12 @@
                         scales: {
                             y: {
                                 beginAtZero: true,
-                                ticks: { precision: 0 }
+                                ticks: { precision: 0, color: '#64748b' },
+                                grid: { color: '#f1f5f9' }
                             },
                             x: {
-                                ticks: { font: { size: 10 } }
+                                ticks: { font: { size: 10 }, color: '#334155' },
+                                grid: { display: false }
                             }
                         }
                     }
