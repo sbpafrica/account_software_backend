@@ -4,6 +4,25 @@ from pathlib import Path
 from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = BASE_DIR.parent
+
+# Automatically load environment variables from .env if present (root or app dir)
+for _env_candidate in [ROOT_DIR / '.env', BASE_DIR / '.env']:
+    if _env_candidate.is_file():
+        try:
+            with open(_env_candidate, 'r', encoding='utf-8') as _ef:
+                for _line in _ef:
+                    _line = _line.strip()
+                    if not _line or _line.startswith('#') or '=' not in _line:
+                        continue
+                    _k, _v = _line.split('=', 1)
+                    _k = _k.strip()
+                    _v = _v.strip().strip("'\"")
+                    if _k not in os.environ:
+                        os.environ[_k] = _v
+        except Exception:
+            pass
+        break
 
 DEBUG = os.environ.get('DEBUG', '1').strip().lower() in ('1', 'true', 'yes', 'on')
 IS_TESTING = 'pytest' in sys.modules or 'test' in sys.argv or os.environ.get('TESTING') == '1'
