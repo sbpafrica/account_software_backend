@@ -265,6 +265,8 @@ class OrganizationDetailApi(APIView):
                 name=serializer.validated_data.get('name'),
                 base_currency=serializer.validated_data.get('base_currency'),
                 billing_email=serializer.validated_data.get('billing_email'),
+                is_inhouse=serializer.validated_data.get('is_inhouse'),
+                plan=serializer.validated_data.get('plan'),
                 settings_dict=serializer.validated_data.get('settings'),
             )
         except PermissionDenied as e:

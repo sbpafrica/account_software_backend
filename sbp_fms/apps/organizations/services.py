@@ -268,18 +268,22 @@ class OrganizationService:
         name: str = None,
         base_currency: str = None,
         billing_email: str = None,
+        is_inhouse: bool = None,
+        plan: str = None,
         settings_dict: dict = None
     ) -> Organization:
         """
-        Updates organization settings. Only OWNER or ADMIN may update.
+        Updates organization settings. Only OWNER or ADMIN may update standard fields.
+        In-house status and direct plan tier assignment are restricted to Superadmins and Stakeholders.
         """
         membership = OrganizationMembership.objects.filter(
             organization_id=organization_id,
             user=user,
-            role__in=[OrganizationRole.OWNER, OrganizationRole.ADMIN]
+            role__in=[OrganizationRole.OWNER, OrganizationRole.ADMIN, 'STAKEHOLDER']
         ).first()
 
-        if not membership and not user.is_superuser:
+        is_privileged = user.is_superuser or getattr(user, 'is_stakeholder', False)
+        if not membership and not is_privileged:
             raise PermissionDenied("You do not have administrative permission to modify this organization.")
 
         org = Organization.objects.select_for_update().get(id=organization_id)
@@ -289,6 +293,14 @@ class OrganizationService:
             org.base_currency = base_currency.strip().upper()
         if billing_email is not None:
             org.billing_email = billing_email.strip().lower()
+        if is_inhouse is not None:
+            if not is_privileged:
+                raise PermissionDenied("Only Platform Superadmins and Stakeholders can toggle in-house status.")
+            org.is_inhouse = is_inhouse
+        if plan is not None:
+            if not is_privileged:
+                raise PermissionDenied("Only Platform Superadmins and Stakeholders can directly modify subscription plan tier.")
+            org.plan = plan
         if settings_dict is not None:
             current_settings = dict(org.settings or {})
             current_settings.update(settings_dict)

@@ -224,6 +224,11 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     )
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    is_stakeholder = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Designates internal stakeholder / executive / board member / auditor. Bypasses all payment and trial gating."
+    )
 
     objects = UserManager()
 

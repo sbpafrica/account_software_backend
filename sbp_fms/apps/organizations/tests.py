@@ -229,7 +229,7 @@ class TestOrganizationEndpoints:
         assert org.days_remaining == 0
 
         # 3. Financial operations locked with HTTP 402 Payment Required
-        res = api_client.get(f"/api/v1/ledger/accounts/?organization_id={org.id}")
+        res = api_client.get(f"/api/v1/ledger/public/accounts/?organization_id={org.id}")
         assert res.status_code == 402
         data = res.json()
         assert data['code'] == 'SUBSCRIPTION_EXPIRED'
@@ -300,4 +300,72 @@ class TestOrganizationEndpoints:
         assert res.status_code == status.HTTP_200_OK
         data = res.json()['data']
         assert len(data) >= 1
+
+    def test_inhouse_organization_never_expires_and_never_blocked(self, api_client, saas_owner):
+        """
+        Verify that an in-house organization (is_inhouse=True) is permanently exempt
+        from subscription paywalls and never blocked with HTTP 402 even if plan_expires_at is in the past.
+        """
+        org = saas_owner['org']
+        tokens = saas_owner['tokens']
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+        # Mark organization as in-house
+        org.is_inhouse = True
+        org.plan = SubscriptionPlanTier.INHOUSE
+        org.plan_expires_at = timezone.now() - datetime.timedelta(days=100)  # artificially past date
+        org.save()
+
+        assert org.is_subscription_active is True
+        assert org.is_trial is False
+        assert org.days_remaining == 99999
+
+        # Request to financial domain endpoint works without 402
+        res = api_client.get(f"/api/v1/ledger/public/accounts/?organization_id={org.id}")
+        assert res.status_code == status.HTTP_200_OK
+
+    def test_stakeholder_user_bypasses_subscription_lock(self, api_client, saas_owner):
+        """
+        Verify that internal stakeholders / board members / auditors can access and audit any organization
+        (even an expired trial organization) without being blocked by HTTP 402.
+        """
+        org = saas_owner['org']
+        org.is_inhouse = False
+        org.plan = SubscriptionPlanTier.TRIAL
+        org.plan_expires_at = timezone.now() - datetime.timedelta(days=5)  # Expired trial
+        org.save()
+
+        # Regular owner is blocked with 402
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {saas_owner['tokens']['access']}")
+        res_blocked = api_client.get(f"/api/v1/ledger/public/accounts/?organization_id={org.id}")
+        assert res_blocked.status_code == status.HTTP_402_PAYMENT_REQUIRED
+
+        # Stakeholder user accesses the same expired tenant
+        stakeholder = User.objects.create_user(
+            email="stakeholder.auditor@sbpafrica.group",
+            password="StakeholderPass123!",
+            first_name="Board",
+            last_name="Member",
+            is_stakeholder=True
+        )
+        from rest_framework_simplejwt.tokens import RefreshToken
+        stakeholder_token = str(RefreshToken.for_user(stakeholder).access_token)
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {stakeholder_token}")
+
+        res_allowed = api_client.get(f"/api/v1/ledger/public/accounts/?organization_id={org.id}")
+        assert res_allowed.status_code == status.HTTP_200_OK
+
+    def test_customer_cannot_self_assign_inhouse_status(self, api_client, saas_owner):
+        """
+        Verify that normal customer tenant owners cannot self-assign is_inhouse=True (HTTP 403 Forbidden).
+        Only Superadmins/Stakeholders can grant in-house exemption.
+        """
+        org = saas_owner['org']
+        tokens = saas_owner['tokens']
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+        url = reverse('organization-detail', kwargs={'organization_id': org.id})
+        res = api_client.patch(url, {'is_inhouse': True}, format='json')
+        assert res.status_code == status.HTTP_403_FORBIDDEN
+
 

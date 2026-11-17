@@ -14609,6 +14609,7 @@ components:
             * `ACCOUNTANT` - Senior Accountant (Journals, Ledgers, Approvals)
             * `CLERK` - Finance Clerk (Data Entry, Invoicing, Vouchers)
             * `AUDITOR` - Auditor (Strictly Read-Only Access)
+            * `STAKEHOLDER` - Stakeholder / Board Member (Full Access, Exempt)
             * `MEMBER` - Standard Member
       required:
       - email
@@ -14687,6 +14688,12 @@ components:
           type: string
           readOnly: true
           description: Default base reporting currency (e.g. GHS, USD, NGN, KES).
+        is_inhouse:
+          type: boolean
+          readOnly: true
+          description: Designates internal in-house entity (e.g. SBP holding company,
+            internal subsidiaries). Permanently exempt from billing and subscription
+            expiration.
         is_subscription_active:
           type: boolean
           readOnly: true
@@ -14729,6 +14736,7 @@ components:
       - days_remaining
       - id
       - is_active
+      - is_inhouse
       - is_subscription_active
       - is_trial
       - name
@@ -14831,6 +14839,7 @@ components:
       - ACCOUNTANT
       - CLERK
       - AUDITOR
+      - STAKEHOLDER
       - MEMBER
       type: string
       description: |-
@@ -14839,6 +14848,7 @@ components:
         * `ACCOUNTANT` - Senior Accountant (Journals, Ledgers, Approvals)
         * `CLERK` - Finance Clerk (Data Entry, Invoicing, Vouchers)
         * `AUDITOR` - Auditor (Strictly Read-Only Access)
+        * `STAKEHOLDER` - Stakeholder / Board Member (Full Access, Exempt)
         * `MEMBER` - Standard Member
     OrganizationSwitchInputRequest:
       type: object
@@ -14872,7 +14882,8 @@ components:
       - role
     OrganizationUpdateInputRequest:
       type: object
-      description: Payload for updating organization settings and branding.
+      description: Payload for updating organization settings, plan, and in-house
+        status.
       properties:
         name:
           type: string
@@ -14886,6 +14897,16 @@ components:
           type: string
           format: email
           minLength: 1
+        is_inhouse:
+          type: boolean
+          description: Set organization as an in-house entity (Exempt from all billing).
+            Restricted to Superadmins/Stakeholders.
+        plan:
+          type: string
+          minLength: 1
+          description: Subscription plan tier (e.g. INHOUSE, ENTERPRISE). Restricted
+            to Superadmins/Stakeholders.
+          maxLength: 50
         settings:
           type: object
           additionalProperties: {}
@@ -16036,7 +16057,8 @@ components:
           format: date
     PatchedOrganizationUpdateInputRequest:
       type: object
-      description: Payload for updating organization settings and branding.
+      description: Payload for updating organization settings, plan, and in-house
+        status.
       properties:
         name:
           type: string
@@ -16050,6 +16072,16 @@ components:
           type: string
           format: email
           minLength: 1
+        is_inhouse:
+          type: boolean
+          description: Set organization as an in-house entity (Exempt from all billing).
+            Restricted to Superadmins/Stakeholders.
+        plan:
+          type: string
+          minLength: 1
+          description: Subscription plan tier (e.g. INHOUSE, ENTERPRISE). Restricted
+            to Superadmins/Stakeholders.
+          maxLength: 50
         settings:
           type: object
           additionalProperties: {}
@@ -17505,6 +17537,7 @@ components:
       - STARTER
       - GROWTH
       - ENTERPRISE
+      - INHOUSE
       - CUSTOM
       type: string
       description: |-
@@ -17512,6 +17545,7 @@ components:
         * `STARTER` - Starter Tier (Single Entity)
         * `GROWTH` - Growth Tier (Multi-Entity / Multi-Currency)
         * `ENTERPRISE` - Enterprise Tier (Unlimited Subsidiaries & Custom Rules)
+        * `INHOUSE` - In-House / Internal (Exempt)
         * `CUSTOM` - Custom Dynamic Plan
     SubscriptionTransactionOutput:
       type: object

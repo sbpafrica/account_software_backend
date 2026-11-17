@@ -17,6 +17,7 @@ class SubscriptionPlanTier(models.TextChoices):
     STARTER = 'STARTER', 'Starter Tier (Single Entity)'
     GROWTH = 'GROWTH', 'Growth Tier (Multi-Entity / Multi-Currency)'
     ENTERPRISE = 'ENTERPRISE', 'Enterprise Tier (Unlimited Subsidiaries & Custom Rules)'
+    INHOUSE = 'INHOUSE', 'In-House / Internal (Exempt)'
     CUSTOM = 'CUSTOM', 'Custom Dynamic Plan'
 
 
@@ -75,6 +76,11 @@ class Organization(BaseModel):
     paystack_subscription_code = models.CharField(max_length=100, blank=True, default='', help_text="Paystack Subscription Code (e.g. SUB_xxxx)")
     base_currency = models.CharField(max_length=3, default='GHS', help_text="Default base reporting currency (e.g. GHS, USD, NGN, KES).")
     is_active = models.BooleanField(default=True, db_index=True)
+    is_inhouse = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Designates internal in-house entity (e.g. SBP holding company, internal subsidiaries). Permanently exempt from billing and subscription expiration."
+    )
     billing_email = models.EmailField(blank=True, default='')
     settings = models.JSONField(default=dict, blank=True, help_text="Tenant-specific customizations, feature flags, and UI branding.")
 
@@ -90,10 +96,12 @@ class Organization(BaseModel):
     def is_subscription_active(self) -> bool:
         """
         Evaluates whether the organization has an active, valid subscription or trial.
-        Returns False if the 30-day trial or paid plan has expired.
+        In-house organizations (is_inhouse=True or plan='INHOUSE') are permanently active.
         """
         if not self.is_active:
             return False
+        if self.is_inhouse or self.plan in (SubscriptionPlanTier.ENTERPRISE, SubscriptionPlanTier.INHOUSE):
+            return True
         if self.plan_expires_at:
             from django.utils import timezone
             return self.plan_expires_at > timezone.now()
@@ -101,10 +109,14 @@ class Organization(BaseModel):
 
     @property
     def is_trial(self) -> bool:
+        if self.is_inhouse or self.plan in (SubscriptionPlanTier.ENTERPRISE, SubscriptionPlanTier.INHOUSE):
+            return False
         return self.plan == SubscriptionPlanTier.TRIAL
 
     @property
     def days_remaining(self) -> int:
+        if self.is_inhouse or self.plan in (SubscriptionPlanTier.ENTERPRISE, SubscriptionPlanTier.INHOUSE):
+            return 99999  # Unlimited lifetime access
         if not self.plan_expires_at:
             return 0
         from django.utils import timezone
@@ -129,6 +141,7 @@ class OrganizationRole(models.TextChoices):
     ACCOUNTANT = 'ACCOUNTANT', 'Senior Accountant (Journals, Ledgers, Approvals)'
     CLERK = 'CLERK', 'Finance Clerk (Data Entry, Invoicing, Vouchers)'
     AUDITOR = 'AUDITOR', 'Auditor (Strictly Read-Only Access)'
+    STAKEHOLDER = 'STAKEHOLDER', 'Stakeholder / Board Member (Full Access, Exempt)'
     MEMBER = 'MEMBER', 'Standard Member'
 
 

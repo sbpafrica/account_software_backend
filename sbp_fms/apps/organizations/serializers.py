@@ -66,7 +66,7 @@ class OrganizationOutputSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'slug', 'subdomain',
             'plan', 'subscription_plan', 'plan_expires_at', 'base_currency',
-            'is_subscription_active', 'is_trial', 'days_remaining',
+            'is_inhouse', 'is_subscription_active', 'is_trial', 'days_remaining',
             'paystack_customer_code', 'paystack_subscription_code',
             'is_active', 'billing_email', 'settings',
             'created_at', 'updated_at'
@@ -198,11 +198,13 @@ class OrganizationAcceptInviteInputSerializer(serializers.Serializer):
 
 class OrganizationUpdateInputSerializer(serializers.Serializer):
     """
-    Payload for updating organization settings and branding.
+    Payload for updating organization settings, plan, and in-house status.
     """
     name = serializers.CharField(max_length=200, required=False)
     base_currency = serializers.CharField(max_length=3, required=False)
     billing_email = serializers.EmailField(required=False)
+    is_inhouse = serializers.BooleanField(required=False, help_text="Set organization as an in-house entity (Exempt from all billing). Restricted to Superadmins/Stakeholders.")
+    plan = serializers.CharField(max_length=50, required=False, help_text="Subscription plan tier (e.g. INHOUSE, ENTERPRISE). Restricted to Superadmins/Stakeholders.")
     settings = serializers.DictField(required=False, help_text="Tenant-specific customizations and UI branding.")
 
 

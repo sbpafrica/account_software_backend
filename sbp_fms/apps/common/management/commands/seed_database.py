@@ -222,25 +222,29 @@ class Command(BaseCommand):
                 'assigned_country': 'GH',
                 'is_staff': True,
                 'is_superuser': True,
+                'is_stakeholder': True,
                 'is_active': True,
                 'role': roles_map[UserRole.SUPER_ADMIN]
             }
         )
+        admin.is_stakeholder = True
         admin.set_password(default_pwd)
         admin.save()
         users_map['superadmin'] = admin
 
-        # 2. Finance Manager
+        # 2. Finance Manager (Stakeholder)
         finance_mgr, _ = User.objects.get_or_create(
             email='finance@sbpafrica.group',
             defaults={
                 'first_name': 'Kwame',
                 'last_name': 'Mensah',
                 'assigned_country': 'GH',
+                'is_stakeholder': True,
                 'is_active': True,
                 'role': roles_map[UserRole.FINANCE_MANAGER]
             }
         )
+        finance_mgr.is_stakeholder = True
         finance_mgr.set_password(default_pwd)
         finance_mgr.save()
         users_map['finance_mgr'] = finance_mgr
@@ -260,17 +264,19 @@ class Command(BaseCommand):
         accountant.save()
         users_map['accountant'] = accountant
 
-        # 4. Internal Auditor
+        # 4. Internal Auditor (Stakeholder)
         auditor, _ = User.objects.get_or_create(
             email='auditor@sbpafrica.group',
             defaults={
                 'first_name': 'David',
                 'last_name': 'Otieno',
                 'assigned_country': 'KE',
+                'is_stakeholder': True,
                 'is_active': True,
                 'role': roles_map[UserRole.INTERNAL_AUDITOR]
             }
         )
+        auditor.is_stakeholder = True
         auditor.set_password(default_pwd)
         auditor.save()
         users_map['auditor'] = auditor
@@ -355,21 +361,26 @@ class Command(BaseCommand):
         trial_expiry = now + datetime.timedelta(days=30)
         orgs_map = {}
 
-        # 1. SBP Africa Group (Primary Corporate Tenant)
+        # 1. SBP Africa Group (Primary Corporate Tenant - In-House Exempt)
         sbp_org, _ = Organization.objects.get_or_create(
             slug='sbp-africa-group',
             defaults={
                 'name': 'SBP Africa Group Ltd',
                 'subdomain': 'sbp-africa',
-                'plan': SubscriptionPlanTier.ENTERPRISE,
+                'plan': SubscriptionPlanTier.INHOUSE,
                 'subscription_plan': plans_map['enterprise-annual'],
-                'plan_expires_at': now + datetime.timedelta(days=365),
+                'plan_expires_at': None,  # In-House never expires
+                'is_inhouse': True,       # Completely exempt from all billing & subscription gating
                 'base_currency': 'GHS',
                 'billing_email': 'billing@sbpafrica.group',
                 'is_active': True,
                 'settings': {'timezone': 'UTC', 'fiscal_year_start': '01-01'}
             }
         )
+        sbp_org.is_inhouse = True
+        sbp_org.plan = SubscriptionPlanTier.INHOUSE
+        sbp_org.plan_expires_at = None
+        sbp_org.save()
         orgs_map['primary'] = sbp_org
 
         # Assign memberships

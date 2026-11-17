@@ -28,6 +28,30 @@ class TenantMiddleware(MiddlewareMixin):
 
             # Enforce 30-day trial and subscription expiration
             if not org.is_subscription_active:
+                # 1. In-House Organizations are permanently exempt
+                if getattr(org, 'is_inhouse', False):
+                    return None
+
+                # 2. Check if the authenticated user is an internal stakeholder or superadmin
+                user = getattr(request, 'user', None)
+                if user and user.is_authenticated:
+                    if (
+                        user.is_superuser
+                        or getattr(user, 'is_stakeholder', False)
+                        or (getattr(user, 'role', None) and user.role.name in ('SUPER_ADMIN', 'INTERNAL_AUDITOR'))
+                    ):
+                        # Stakeholders / Executives / Auditors have unrestricted access across any organization
+                        return None
+
+                    # Check tenant-specific stakeholder membership
+                    is_tenant_stakeholder = OrganizationMembership.objects.filter(
+                        organization=org,
+                        user=user,
+                        role='STAKEHOLDER'
+                    ).exists()
+                    if is_tenant_stakeholder:
+                        return None
+
                 path = request.path_info
                 # Endpoints that must remain accessible so expired tenants can subscribe or view plans
                 exempt_paths = (
@@ -46,30 +70,24 @@ class TenantMiddleware(MiddlewareMixin):
                     '/api/redoc/',
                 )
                 if not any(path.startswith(p) for p in exempt_paths):
-                    user = getattr(request, 'user', None)
-                    is_super = False
-                    if user and user.is_authenticated and (user.is_superuser or (getattr(user, 'role', None) and user.role.name == 'SUPER_ADMIN')):
-                        is_super = True
-
-                    if not is_super:
-                        from django.http import JsonResponse
-                        return JsonResponse({
-                            'status': 'error',
-                            'code': 'SUBSCRIPTION_EXPIRED',
-                            'message': (
-                                f"The 30-day trial for '{org.name}' expired on "
-                                f"{org.plan_expires_at.strftime('%Y-%m-%d') if org.plan_expires_at else 'recently'}. "
-                                "All system operations are locked. Please subscribe to a package to continue."
-                            ),
-                            'data': {
-                                'organization_id': str(org.id),
-                                'organization_name': org.name,
-                                'plan': org.plan,
-                                'expired_at': org.plan_expires_at.isoformat() if org.plan_expires_at else None,
-                                'is_expired': True,
-                                'upgrade_url': '/api/v1/organizations/plans/'
-                            }
-                        }, status=402)
+                    from django.http import JsonResponse
+                    return JsonResponse({
+                        'status': 'error',
+                        'code': 'SUBSCRIPTION_EXPIRED',
+                        'message': (
+                            f"The 30-day trial for '{org.name}' expired on "
+                            f"{org.plan_expires_at.strftime('%Y-%m-%d') if org.plan_expires_at else 'recently'}. "
+                            "All system operations are locked. Please subscribe to a package to continue."
+                        ),
+                        'data': {
+                            'organization_id': str(org.id),
+                            'organization_name': org.name,
+                            'plan': org.plan,
+                            'expired_at': org.plan_expires_at.isoformat() if org.plan_expires_at else None,
+                            'is_expired': True,
+                            'upgrade_url': '/api/v1/organizations/plans/'
+                        }
+                    }, status=402)
 
     def process_response(self, request, response):
         clear_current_organization()
