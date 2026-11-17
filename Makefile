@@ -7,7 +7,7 @@ PYTHON := uv run python
 MANAGE := PYTHONPATH=sbp_fms $(PYTHON) sbp_fms/manage.py
 PYTEST := PYTHONPATH=sbp_fms uv run pytest sbp_fms
 
-.PHONY: help install dev migrate makemigrations superuser shell test test-fast test-cov \
+.PHONY: help install dev migrate makemigrations superuser seed seed-clean shell test test-fast test-cov \
         validate-schema run gunicorn celery celery-beat collectstatic \
         infra-up infra-down infra-logs dev-docker-up dev-docker-down \
         logs logs-app logs-celery logs-nginx logs-infra logs-file \
@@ -27,6 +27,8 @@ help:
 	@echo "   make migrate            Apply database migrations"
 	@echo "   make makemigrations     Generate new database migrations"
 	@echo "   make superuser          Create a new Django superuser"
+	@echo "   make seed               Seed database with comprehensive test data for all apps"
+	@echo "   make seed-clean         Clean existing test data and re-seed from scratch"
 	@echo ""
 	@echo " Development Server & Workers:"
 	@echo "   make dev                Run local Django development server (port 8000)"
@@ -82,6 +84,14 @@ makemigrations:
 superuser:
 	@echo "==> Creating superuser..."
 	$(MANAGE) createsuperuser
+
+seed:
+	@echo "==> Seeding database with comprehensive test data for all apps..."
+	$(MANAGE) seed_database
+
+seed-clean:
+	@echo "==> Cleaning previous demo data and re-seeding..."
+	$(MANAGE) seed_database --clean
 
 shell:
 	@echo "==> Opening Django shell..."
