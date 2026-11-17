@@ -283,9 +283,47 @@ SPECTACULAR_SETTINGS = {
 }
 
 CORS_ALLOW_ALL_ORIGINS = bool(int(os.environ.get('CORS_ALLOW_ALL_ORIGINS', '1' if DEBUG else '0')))
+CORS_ALLOW_CREDENTIALS = True
+
+# Standard Default Allowed Origins
+CORS_ALLOWED_ORIGINS = [
+    'https://fms.sbpafrica.group',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://127.0.0.1:5173',
+]
+
 cors_allowed = os.environ.get('CORS_ALLOWED_ORIGINS', '')
 if cors_allowed:
-    CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_allowed.split(',') if o.strip()]
+    for _origin in cors_allowed.split(','):
+        _o = _origin.strip()
+        if _o and _o not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append(_o)
+
+# Wildcard regex for all local developer ports and company subdomains
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https?://localhost(:[0-9]+)?$",
+    r"^https?://127\.0\.0\.1(:[0-9]+)?$",
+    r"^https?://.*\.sbpafrica\.group$",
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-idempotency-key',
+    'x-organization-id',
+    'x-tenant-id',
+]
 
 CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
