@@ -11,7 +11,7 @@ PYTEST := PYTHONPATH=sbp_fms uv run pytest sbp_fms
         validate-schema run gunicorn celery celery-beat collectstatic \
         infra-up infra-down infra-logs dev-docker-up dev-docker-down \
         logs logs-app logs-celery logs-nginx logs-infra logs-file \
-        deploy-local clean
+        deploy deploy-local restart status clean
 
 # ------------------------------------------------------------------------------
 # 1. HELP & DISCOVERY
@@ -59,6 +59,9 @@ help:
 	@echo "   make logs-file          Tail application log files in ./logs/"
 	@echo ""
 	@echo " Deployment & Maintenance:"
+	@echo "   make deploy             Run full production deployment script"
+	@echo "   make restart            Restart all production services (Docker, Django, Celery, Nginx)"
+	@echo "   make status             Show status of all production services"
 	@echo "   make deploy-local       Execute deploy_production.sh script locally on server"
 	@echo "   make clean              Clean up Python bytecode, pytest cache, and artifacts"
 	@echo "========================================================================"
@@ -219,9 +222,42 @@ logs-file:
 # ------------------------------------------------------------------------------
 # 8. DEPLOYMENT & MAINTENANCE
 # ------------------------------------------------------------------------------
+deploy: deploy-local
+
 deploy-local:
-	@echo "==> Running server deployment script..."
+	@echo "==> Running production deployment script..."
 	bash deploy/scripts/deploy_production.sh
+
+restart:
+	@echo "==> Restarting all SBP-FMS production services..."
+	@if [ -f "docker-compose.prod.yml" ] && command -v docker &> /dev/null; then \
+		docker compose -f docker-compose.prod.yml up -d --remove-orphans; \
+	fi
+	@if command -v systemctl &> /dev/null; then \
+		sudo systemctl daemon-reload; \
+		sudo systemctl restart sbp-fms sbp-fms-celery sbp-fms-celery-beat; \
+		sudo nginx -t && sudo systemctl reload nginx; \
+		echo "[+] All production services restarted successfully."; \
+	fi
+
+status:
+	@echo "=========================================================="
+	@echo " SBP-FMS Production Services Status"
+	@echo "=========================================================="
+	@if command -v systemctl &> /dev/null; then \
+		systemctl status sbp-fms --no-pager -l || true; \
+		echo "----------------------------------------------------------"; \
+		systemctl status sbp-fms-celery --no-pager -l || true; \
+		echo "----------------------------------------------------------"; \
+		systemctl status sbp-fms-celery-beat --no-pager -l || true; \
+		echo "----------------------------------------------------------"; \
+		systemctl status nginx --no-pager -l || true; \
+	fi
+	@if [ -f "docker-compose.prod.yml" ] && command -v docker &> /dev/null; then \
+		echo "----------------------------------------------------------"; \
+		echo "Docker Containers:"; \
+		docker compose -f docker-compose.prod.yml ps; \
+	fi
 
 clean:
 	@echo "==> Cleaning cache and temporary files..."

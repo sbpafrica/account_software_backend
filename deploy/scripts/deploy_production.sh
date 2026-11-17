@@ -85,9 +85,9 @@ else
   fi
 fi
 
-# 8. Ensure SSL Certificate is provisioned for fms.sbpafrica.group
-if command -v certbot &> /dev/null && [ ! -d "/etc/letsencrypt/live/fms.sbpafrica.group" ]; then
-  echo "[+] Provisioning Let's Encrypt SSL certificate for fms.sbpafrica.group..."
+# 8. Ensure SSL Certificate is provisioned & configured for fms.sbpafrica.group
+if command -v certbot &> /dev/null; then
+  echo "[+] Ensuring Let's Encrypt SSL certificate is configured for fms.sbpafrica.group..."
   if [ -n "${SSH_PASSWORD:-}" ]; then
     echo "$SSH_PASSWORD" | sudo -S certbot --nginx -d fms.sbpafrica.group --non-interactive --agree-tos -m admin@sbpafrica.group --redirect || true
   else
