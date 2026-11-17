@@ -47,12 +47,17 @@ class LedgerService:
 
     @staticmethod
     @transaction.atomic
-    def account_create(*, code: str, name: str, account_type: str, currency: str = 'GHS',
+    def account_create(*, name: str, account_type: str, code: str = '', currency: str = 'GHS',
                        country_code: str = 'GH', description: str = '',
                        subtype: str = '', parent_id=None, opening_balance: Decimal = Decimal('0.0000'),
                        opening_balance_date=None, allow_direct_posting: bool = True) -> Account:
-        if Account.objects.filter(code=code).exists():
-            raise ValidationError(f"Account code '{code}' already exists.")
+        if not code or not str(code).strip():
+            code = Account.generate_next_code(account_type)
+        else:
+            code = str(code).strip()
+            if Account.objects.filter(code=code).exists():
+                raise ValidationError(f"Account code '{code}' already exists.")
+
         parent = Account.objects.get(id=parent_id) if parent_id else None
         account = Account.objects.create(
             code=code,
@@ -67,7 +72,7 @@ class LedgerService:
             opening_balance_date=opening_balance_date,
             allow_direct_posting=allow_direct_posting
         )
-        CacheManager.delete_pattern("fms:accounts:")
+        CacheManager.delete_pattern("fms:accounts:*")
         return account
 
     @staticmethod

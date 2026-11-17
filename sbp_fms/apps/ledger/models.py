@@ -10,7 +10,7 @@ class AccountType(models.TextChoices):
     EQUITY = 'EQUITY', 'Equity (3000-3999)'
     REVENUE = 'REVENUE', 'Revenue (4000-4999)'
     DIRECT_COST = 'DIRECT_COST', 'Direct Cost (5000-5999)'
-    OPEX = 'OPEX', 'Operating Expense (6000-6999)'
+    OPEX = 'OPEX', 'Operating Expense (6000-7999)'
 
 class CompanyProfile(TenantModel):
     company_name = models.CharField(max_length=255)
@@ -51,7 +51,22 @@ class CostCentre(BaseModel):
         return f"{self.code} - {self.name}"
 
 class Account(BaseModel):
-    code = models.CharField(max_length=20, unique=True, db_index=True)
+    ACCOUNT_CODE_RANGES = {
+        AccountType.ASSET: (1000, 1999),
+        AccountType.LIABILITY: (2000, 2999),
+        AccountType.EQUITY: (3000, 3999),
+        AccountType.REVENUE: (4000, 4999),
+        AccountType.DIRECT_COST: (5000, 5999),
+        AccountType.OPEX: (6000, 7999),
+    }
+
+    code = models.CharField(
+        max_length=20,
+        unique=True,
+        db_index=True,
+        blank=True,
+        help_text="Leave blank to automatically generate code based on Account Type."
+    )
     name = models.CharField(max_length=255)
     account_type = models.CharField(max_length=20, choices=AccountType.choices)
     subtype = models.CharField(max_length=50, blank=True, default='')
@@ -66,6 +81,50 @@ class Account(BaseModel):
 
     class Meta:
         ordering = ['code']
+
+    @classmethod
+    def generate_next_code(cls, account_type: str) -> str:
+        """
+        Automatically generates the next sequential account code adhering to the standard IFRS/GAAP COA structure:
+          - 1000 - 1999: Assets (Current, Non-Current, Bank, Accounts Receivable)
+          - 2000 - 2999: Liabilities (Current, Accounts Payable, Accruals, Tax Liabilities)
+          - 3000 - 3999: Equity (Share Capital, Retained Earnings, Currency Translation Reserve)
+          - 4000 - 4999: Revenue (Service Fees, Management Fees, Reimbursable Revenue)
+          - 5000 - 5999: Cost of Sales / Direct Workforce Costs (Direct Salaries, Statutory Social Security)
+          - 6000 - 7999: Operating Expenses (Rent, Utilities, IT, Depreciation)
+        """
+        import re
+        min_code, max_code = cls.ACCOUNT_CODE_RANGES.get(account_type, (1000, 1999))
+
+        existing_codes = list(cls.objects.values_list('code', flat=True))
+        used_numbers = set()
+        for c in existing_codes:
+            m = re.match(r'^(\d{4})', str(c).strip())
+            if m:
+                used_numbers.add(int(m.group(1)))
+
+        # Standard accounting codes increment by 10 (e.g. 1010, 1020, 1030...)
+        candidate = min_code + 10
+        while candidate <= max_code:
+            if candidate not in used_numbers and str(candidate) not in existing_codes:
+                return str(candidate)
+            candidate += 10
+
+        # Fallback to single increments (e.g. 1001, 1002...) if multiples of 10 are filled
+        candidate = min_code + 1
+        while candidate <= max_code:
+            if candidate not in used_numbers and str(candidate) not in existing_codes:
+                return str(candidate)
+            candidate += 1
+
+        raise ValidationError(f"All account codes in range {min_code} - {max_code} for {account_type} are in use.")
+
+    def save(self, *args, **kwargs):
+        if not self.code or not str(self.code).strip():
+            self.code = self.generate_next_code(self.account_type)
+        else:
+            self.code = str(self.code).strip()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.code} - {self.name} ({self.currency})"

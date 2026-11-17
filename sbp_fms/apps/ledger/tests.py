@@ -73,6 +73,33 @@ class TestLedgerCRUD:
         assert res_delete.status_code == status.HTTP_200_OK
         assert not Account.objects.filter(id=account_id).exists()
 
+    def test_automatic_account_code_generation(self, api_client, superuser):
+        api_client.force_authenticate(user=superuser)
+
+        # 1. Test auto-generation via API without specifying code
+        create_url = reverse("account-create-admin")
+        res = api_client.post(create_url, {
+            "name": "Auto Generated Asset Account",
+            "account_type": AccountType.ASSET,
+            "currency": "GHS"
+        }, format="json")
+        assert res.status_code == status.HTTP_201_CREATED
+        code = res.data["data"]["code"]
+        assert 1000 <= int(code) <= 1999
+
+        # 2. Test auto-generation across all account types via model save()
+        ranges = {
+            AccountType.ASSET: (1000, 1999),
+            AccountType.LIABILITY: (2000, 2999),
+            AccountType.EQUITY: (3000, 3999),
+            AccountType.REVENUE: (4000, 4999),
+            AccountType.DIRECT_COST: (5000, 5999),
+            AccountType.OPEX: (6000, 7999),
+        }
+        for acct_type, (min_c, max_c) in ranges.items():
+            acct = Account.objects.create(name=f"Auto {acct_type}", account_type=acct_type)
+            assert min_c <= int(acct.code) <= max_c
+
     def test_journal_entry_post_and_reverse(self, api_client, superuser):
         api_client.force_authenticate(user=superuser)
 

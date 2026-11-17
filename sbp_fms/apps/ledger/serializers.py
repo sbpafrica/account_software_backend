@@ -52,7 +52,7 @@ class AccountOutputSerializer(serializers.ModelSerializer):
         fields = ['id', 'code', 'name', 'account_type', 'subtype', 'parent', 'parent_code', 'currency', 'country_code', 'is_active', 'allow_direct_posting', 'opening_balance', 'opening_balance_date', 'description', 'created_at']
 
 class AccountCreateInputSerializer(serializers.Serializer):
-    code = serializers.CharField(max_length=20)
+    code = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
     name = serializers.CharField(max_length=255)
     account_type = serializers.CharField(max_length=20)
     subtype = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
