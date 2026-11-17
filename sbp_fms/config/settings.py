@@ -41,7 +41,8 @@ ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_env.split(',') if h.strip()] i
 AUTH_USER_MODEL = 'users.User'
 
 INSTALLED_APPS = [
-    # Built-in essentials (NO django.contrib.admin since it is disabled)
+    # Built-in essentials
+    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',

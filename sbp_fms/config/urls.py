@@ -1,3 +1,4 @@
+from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
@@ -6,6 +7,9 @@ def health_check(request):
     return JsonResponse({'status': 'ok', 'service': 'sbp-fms-api', 'version': '3.0.0'})
 
 urlpatterns = [
+    # Django Admin Portal
+    path('admin/', admin.site.urls),
+
     # Production Health Check
     path('health/', health_check, name='health-check'),
     path('api/health/', health_check, name='api-health-check'),
