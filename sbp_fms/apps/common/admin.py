@@ -1,0 +1,31 @@
+from django.contrib import admin
+from apps.common.models import AuditLog, DocumentAttachment, IdempotencyRecord
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ('action', 'module', 'resource_type', 'resource_id', 'actor_user', 'ip_address', 'timestamp')
+    list_filter = ('action', 'module', 'resource_type')
+    search_fields = ('resource_type', 'resource_id', 'ip_address')
+    readonly_fields = ('id', 'actor_user', 'action', 'module', 'resource_type', 'resource_id', 'ip_address', 'user_agent', 'changes', 'timestamp')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(DocumentAttachment)
+class DocumentAttachmentAdmin(admin.ModelAdmin):
+    list_display = ('file_name', 'module', 'resource_id', 'file_size_bytes', 'uploaded_by', 'created_at')
+    list_filter = ('module',)
+    search_fields = ('file_name', 'resource_id')
+
+
+@admin.register(IdempotencyRecord)
+class IdempotencyRecordAdmin(admin.ModelAdmin):
+    list_display = ('key', 'request_method', 'request_path', 'response_status_code', 'is_processing', 'created_at')
+    list_filter = ('is_processing', 'request_method')
+    search_fields = ('key', 'request_path')
+    readonly_fields = ('key', 'user', 'organization', 'request_path', 'request_method', 'request_digest', 'response_status_code', 'response_headers', 'response_body', 'is_processing', 'expires_at', 'created_at')
