@@ -1,0 +1,409 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static jazzmin fms_dashboard_tags %}
+{% get_jazzmin_ui_tweaks as jazzmin_ui %}
+{% get_fms_dashboard_metrics as m %}
+
+{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+
+{% block content_title %}
+    <div class="d-flex justify-content-between align-items-center w-100">
+        <div>
+            <h1 class="m-0 text-dark font-weight-bold" style="font-size: 1.75rem;">
+                <i class="fas fa-chart-line text-primary mr-2"></i>Executive Financial Dashboard
+            </h1>
+            <p class="text-muted mb-0 small">Real-time multi-tenant telemetry, subscription analytics, and domain activity.</p>
+        </div>
+        <div>
+            <a href="/api/docs/" target="_blank" class="btn btn-sm btn-primary shadow-sm mr-2">
+                <i class="fas fa-book-open mr-1"></i> Swagger API Docs
+            </a>
+            <a href="/health/" target="_blank" class="btn btn-sm btn-outline-success shadow-sm">
+                <i class="fas fa-heartbeat mr-1"></i> API Health
+            </a>
+        </div>
+    </div>
+{% endblock %}
+
+{% block breadcrumbs %}
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'admin:index' %}"><i class="fas fa-home"></i> {% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Dashboard' %}</li>
+    </ol>
+{% endblock %}
+
+{% block content %}
+    <!-- 1. KPI METRIC SUMMARY CARDS -->
+    <div class="col-12 mb-3">
+        <div class="row">
+            <!-- Total Organizations -->
+            <div class="col-xl-3 col-md-6 col-12 mb-3">
+                <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #3498db !important; background: #fff;">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-uppercase font-weight-bold text-muted small">Total Tenants</div>
+                                <div class="h3 font-weight-bold mb-0 text-dark">{{ m.total_orgs }}</div>
+                                <div class="small mt-1 text-success font-weight-bold">
+                                    <i class="fas fa-check-circle"></i> {{ m.active_orgs }} Active &bull;
+                                    <span class="text-info">{{ m.inhouse_orgs }} In-House</span>
+                                </div>
+                            </div>
+                            <div class="p-3 bg-light rounded-circle text-primary">
+                                <i class="fas fa-building fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Users -->
+            <div class="col-xl-3 col-md-6 col-12 mb-3">
+                <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #2ecc71 !important; background: #fff;">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-uppercase font-weight-bold text-muted small">Platform Users</div>
+                                <div class="h3 font-weight-bold mb-0 text-dark">{{ m.total_users }}</div>
+                                <div class="small mt-1 text-muted">
+                                    <span class="text-success font-weight-bold">{{ m.active_users }} Active</span> &bull;
+                                    <span class="text-secondary">{{ m.staff_users }} Staff</span>
+                                </div>
+                            </div>
+                            <div class="p-3 bg-light rounded-circle text-success">
+                                <i class="fas fa-users fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subscriptions & Plans -->
+            <div class="col-xl-3 col-md-6 col-12 mb-3">
+                <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #f39c12 !important; background: #fff;">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-uppercase font-weight-bold text-muted small">Subscriptions</div>
+                                <div class="h3 font-weight-bold mb-0 text-dark">{{ m.total_plans }} Plans</div>
+                                <div class="small mt-1 text-warning font-weight-bold">
+                                    <i class="fas fa-clock"></i> {{ m.trial_orgs }} on Trial &bull;
+                                    <span class="text-success">{{ m.paid_orgs }} Paid</span>
+                                </div>
+                            </div>
+                            <div class="p-3 bg-light rounded-circle text-warning">
+                                <i class="fas fa-gem fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Health / Status -->
+            <div class="col-xl-3 col-md-6 col-12 mb-3">
+                <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid #9b59b6 !important; background: #fff;">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-uppercase font-weight-bold text-muted small">API & Engine</div>
+                                <div class="h3 font-weight-bold mb-0 text-success">
+                                    <i class="fas fa-check-circle text-success mr-1"></i>ONLINE
+                                </div>
+                                <div class="small mt-1 text-muted">
+                                    v3.0.0 &bull; Celery Active
+                                </div>
+                            </div>
+                            <div class="p-3 bg-light rounded-circle text-purple" style="color: #9b59b6;">
+                                <i class="fas fa-server fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. INTERACTIVE CHARTS & VISUALIZATIONS -->
+    <div class="col-12 mb-4">
+        <div class="row">
+            <!-- Pie / Doughnut Chart: Tenant Tier Distribution -->
+            <div class="col-lg-4 col-12 mb-3">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-0 pb-0 pt-3">
+                        <h6 class="font-weight-bold text-dark m-0">
+                            <i class="fas fa-chart-pie text-info mr-2"></i>Tenants by Plan Tier
+                        </h6>
+                        <small class="text-muted">Breakdown across subscription tiers & internal exemptions</small>
+                    </div>
+                    <div class="card-body d-flex align-items-center justify-content-center p-3" style="min-height: 280px;">
+                        <canvas id="tierDoughnutChart" style="max-height: 250px; width: 100%;"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Line Chart: Platform Growth Over Time -->
+            <div class="col-lg-4 col-12 mb-3">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-0 pb-0 pt-3">
+                        <h6 class="font-weight-bold text-dark m-0">
+                            <i class="fas fa-chart-line text-primary mr-2"></i>Platform Growth Trends
+                        </h6>
+                        <small class="text-muted">Cumulative growth of tenants & team members</small>
+                    </div>
+                    <div class="card-body p-3" style="min-height: 280px;">
+                        <canvas id="growthLineChart" style="max-height: 250px; width: 100%;"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bar Chart: Financial Modules & Platform Entities -->
+            <div class="col-lg-4 col-12 mb-3">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-0 pb-0 pt-3">
+                        <h6 class="font-weight-bold text-dark m-0">
+                            <i class="fas fa-cubes text-success mr-2"></i>Financial Domain Modules
+                        </h6>
+                        <small class="text-muted">Entity volume across core financial micro-apps</small>
+                    </div>
+                    <div class="card-body p-3" style="min-height: 280px;">
+                        <canvas id="moduleBarChart" style="max-height: 250px; width: 100%;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. STANDARD JAZZMIN APPLICATION LIST & RECENT ACTIONS -->
+    {% get_side_menu using="app_list" as dashboard_list %}
+    <div class="col-lg-8 col-12">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white border-0 pt-3 pb-2">
+                <h6 class="font-weight-bold text-dark m-0">
+                    <i class="fas fa-th-large text-secondary mr-2"></i>Application Modules & Model Registry
+                </h6>
+            </div>
+            <div class="card-body p-3">
+                <div class="row">
+                    {% for app in dashboard_list %}
+                        <div class="col-md-6 col-12 mb-3">
+                            <div class="border rounded p-3 h-100 bg-light">
+                                <h6 class="font-weight-bold text-primary mb-2">
+                                    <i class="fas fa-folder-open mr-1"></i> {{ app.name }}
+                                </h6>
+                                <ul class="list-unstyled mb-0 small">
+                                    {% for model in app.models %}
+                                        <li class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                            {% if model.url %}
+                                                <a href="{{ model.url }}" class="text-dark font-weight-500">
+                                                    <i class="fas fa-angle-right text-muted mr-1"></i>{{ model.name }}
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">{{ model.name }}</span>
+                                            {% endif %}
+                                            {% if model.add_url %}
+                                                <a href="{{ model.add_url }}" class="badge badge-primary text-white px-2 py-1">
+                                                    <i class="fas fa-plus mr-1"></i>Add
+                                                </a>
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. SIDEBAR RECENT ACTIONS & SHORTCUTS -->
+    <div class="col-lg-4 col-12">
+        <!-- Quick Documentation & API Access -->
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-white border-0 pt-3 pb-1">
+                <h6 class="font-weight-bold text-dark m-0">
+                    <i class="fas fa-external-link-alt text-info mr-2"></i>Quick Resources
+                </h6>
+            </div>
+            <div class="card-body p-3">
+                <a href="/api/docs/" target="_blank" class="btn btn-outline-primary btn-block text-left mb-2">
+                    <i class="fas fa-book mr-2"></i>Interactive Swagger UI (/api/docs/)
+                </a>
+                <a href="/api/redoc/" target="_blank" class="btn btn-outline-secondary btn-block text-left mb-2">
+                    <i class="fas fa-file-alt mr-2"></i>Redoc Schema View (/api/redoc/)
+                </a>
+                <a href="/health/" target="_blank" class="btn btn-outline-success btn-block text-left">
+                    <i class="fas fa-heartbeat mr-2"></i>API Health Check (/health/)
+                </a>
+            </div>
+        </div>
+
+        <!-- Recent Actions -->
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-white border-0 pt-3 pb-1">
+                <h6 class="font-weight-bold text-dark m-0">
+                    <i class="fas fa-history text-secondary mr-2"></i>{% trans 'Recent Actions' %}
+                </h6>
+            </div>
+            <div class="card-body p-3">
+                {% load log %}
+                {% get_admin_log 8 as admin_log for_user user %}
+                {% if not admin_log %}
+                    <p class="text-muted small mb-0">{% trans 'None available' %}</p>
+                {% else %}
+                    <ul class="timeline list-unstyled mb-0 small">
+                        {% for entry in admin_log %}
+                            <li class="border-bottom py-1">
+                                <span class="badge {% if entry.is_addition %}badge-success{% elif entry.is_change %}badge-warning{% else %}badge-danger{% endif %} mr-1">
+                                    {% if entry.is_addition %}+ Add{% elif entry.is_change %}~ Edit{% else %}- Del{% endif %}
+                                </span>
+                                <span class="font-weight-bold">{{ entry.object_repr }}</span>
+                                <div class="text-muted small">{{ entry.content_type }} &bull; {{ entry.action_time|date:"M d, H:i" }}</div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. CHART.JS INITIALIZATION SCRIPTS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Palette styling
+            const colors = {
+                primary: '#3498db',
+                success: '#2ecc71',
+                warning: '#f39c12',
+                danger: '#e74c3c',
+                purple: '#9b59b6',
+                gray: '#95a5a6',
+                navy: '#34495e',
+            };
+
+            // 1. Doughnut / Pie Chart: Subscription Tiers
+            const tierLabels = {{ m.tier_labels_json|safe }};
+            const tierCounts = {{ m.tier_counts_json|safe }};
+            const ctxTier = document.getElementById('tierDoughnutChart');
+            if (ctxTier) {
+                new Chart(ctxTier, {
+                    type: 'doughnut',
+                    data: {
+                        labels: tierLabels,
+                        datasets: [{
+                            data: tierCounts,
+                            backgroundColor: [colors.warning, colors.primary, colors.success, colors.purple, colors.navy, colors.gray],
+                            borderWidth: 2,
+                            borderColor: '#ffffff',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { boxWidth: 12, font: { size: 11 } }
+                            }
+                        },
+                        cutout: '65%'
+                    }
+                });
+            }
+
+            // 2. Line Chart: Growth Trends
+            const growthLabels = {{ m.monthly_labels_json|safe }};
+            const orgGrowth = {{ m.monthly_orgs_json|safe }};
+            const userGrowth = {{ m.monthly_users_json|safe }};
+            const ctxGrowth = document.getElementById('growthLineChart');
+            if (ctxGrowth) {
+                new Chart(ctxGrowth, {
+                    type: 'line',
+                    data: {
+                        labels: growthLabels,
+                        datasets: [
+                            {
+                                label: 'Tenants',
+                                data: orgGrowth,
+                                borderColor: colors.primary,
+                                backgroundColor: 'rgba(52, 152, 219, 0.15)',
+                                fill: true,
+                                tension: 0.35,
+                                borderWidth: 2,
+                                pointRadius: 3
+                            },
+                            {
+                                label: 'Users',
+                                data: userGrowth,
+                                borderColor: colors.success,
+                                backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                                fill: true,
+                                tension: 0.35,
+                                borderWidth: 2,
+                                pointRadius: 3
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { boxWidth: 12, font: { size: 11 } }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { precision: 0 }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 3. Bar Chart: Financial Domain Modules
+            const moduleLabels = {{ m.module_labels_json|safe }};
+            const moduleCounts = {{ m.module_counts_json|safe }};
+            const ctxModule = document.getElementById('moduleBarChart');
+            if (ctxModule) {
+                new Chart(ctxModule, {
+                    type: 'bar',
+                    data: {
+                        labels: moduleLabels,
+                        datasets: [{
+                            label: 'Entities',
+                            data: moduleCounts,
+                            backgroundColor: [
+                                colors.primary,
+                                colors.success,
+                                colors.navy,
+                                colors.warning,
+                                colors.purple,
+                                colors.gray
+                            ],
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { precision: 0 }
+                            },
+                            x: {
+                                ticks: { font: { size: 10 } }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+{% endblock %}

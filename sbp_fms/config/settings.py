@@ -41,6 +41,9 @@ ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_env.split(',') if h.strip()] i
 AUTH_USER_MODEL = 'users.User'
 
 INSTALLED_APPS = [
+    # Jazzmin Admin Theme (must precede django.contrib.admin)
+    'jazzmin',
+
     # Built-in essentials
     'django.contrib.admin',
     'django.contrib.auth',
@@ -92,7 +95,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -392,5 +395,111 @@ LOGGING = {
             'level': 'WARNING',
             'propagate': False,
         },
+    },
+}
+
+# ==============================================================================
+# JAZZMIN MODERN DASHBOARD & ADMIN THEME CONFIGURATION
+# ==============================================================================
+JAZZMIN_SETTINGS = {
+    "site_title": "SBP-FMS Portal",
+    "site_header": "SBP Financial Management",
+    "site_brand": "SBP-FMS",
+    "site_logo_classes": "img-circle",
+    "welcome_sign": "Welcome to SBP-FMS Central Administration",
+    "copyright": "SBP Africa Group",
+    "search_model": "users.User",
+    "user_avatar": None,
+
+    # Top Menu Navigation Links
+    "topmenu_links": [
+        {"name": "Dashboard", "url": "admin:index", "permissions": ["auth.view_user"]},
+        {"name": "API Swagger", "url": "/api/docs/", "new_window": True},
+        {"name": "ReDoc", "url": "/api/redoc/", "new_window": True},
+        {"name": "System Health", "url": "/health/", "new_window": True},
+    ],
+
+    # User Dropdown Menu Links
+    "usermenu_links": [
+        {"name": "Interactive API Docs", "url": "/api/docs/", "icon": "fas fa-book-open", "new_window": True},
+    ],
+
+    # Navigation & Sidebar
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "hide_apps": [],
+    "hide_models": [],
+    "order_with_respect_to": [
+        "users",
+        "organizations",
+        "ledger",
+        "receivables",
+        "payables",
+        "payroll_escrow",
+        "treasury",
+        "taxation",
+        "assets",
+        "consolidation",
+        "budgeting",
+        "contracts",
+        "auth",
+    ],
+
+    # FontAwesome 5 Icons for Apps & Models
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "auth.Group": "fas fa-user-friends",
+        "users": "fas fa-user-shield",
+        "users.User": "fas fa-user-circle",
+        "users.Role": "fas fa-id-badge",
+        "users.Permission": "fas fa-key",
+        "organizations": "fas fa-city",
+        "organizations.Organization": "fas fa-building",
+        "organizations.SubscriptionPlan": "fas fa-gem",
+        "organizations.SubscriptionTransaction": "fas fa-receipt",
+        "organizations.OrganizationMembership": "fas fa-users",
+        "organizations.OrganizationInvitation": "fas fa-paper-plane",
+        "organizations.PaymentWebhookLog": "fas fa-history",
+    },
+
+    "default_icon_parents": "fas fa-folder",
+    "default_icon_children": "fas fa-circle",
+    "related_modal_active": True,
+    "custom_css": None,
+    "custom_js": None,
+    "use_google_fonts_cdn": True,
+    "show_ui_builder": False,
+    "changeform_format": "horizontal_tabs",
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": False,
+    "footer_small_text": False,
+    "body_small_text": False,
+    "brand_small_text": False,
+    "brand_colour": "navbar-navy",
+    "accent": "accent-primary",
+    "navbar": "navbar-navy navbar-dark",
+    "no_navbar_border": True,
+    "navbar_fixed": True,
+    "layout_boxed": False,
+    "footer_fixed": False,
+    "sidebar_fixed": True,
+    "sidebar": "sidebar-dark-primary",
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": True,
+    "sidebar_nav_compact_style": True,
+    "sidebar_nav_legacy_style": False,
+    "sidebar_nav_flat_style": False,
+    "theme": "flatly",
+    "dark_mode_theme": None,
+    "button_classes": {
+        "primary": "btn-primary",
+        "secondary": "btn-secondary",
+        "info": "btn-info",
+        "warning": "btn-warning",
+        "danger": "btn-danger",
+        "success": "btn-success",
     },
 }
