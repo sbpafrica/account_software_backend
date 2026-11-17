@@ -10,6 +10,7 @@ PYTEST := PYTHONPATH=sbp_fms uv run pytest sbp_fms
 .PHONY: help install dev migrate makemigrations superuser shell test test-fast test-cov \
         validate-schema run gunicorn celery celery-beat collectstatic \
         infra-up infra-down infra-logs dev-docker-up dev-docker-down \
+        logs logs-app logs-celery logs-nginx logs-infra logs-file \
         deploy-local clean
 
 # ------------------------------------------------------------------------------
@@ -46,6 +47,14 @@ help:
 	@echo "   make infra-logs         View logs from PostgreSQL & Redis containers"
 	@echo "   make dev-docker-up      Start Full Local Dev Stack with Docker"
 	@echo "   make dev-docker-down    Stop Full Local Dev Stack"
+	@echo ""
+	@echo " Logging & Monitoring:"
+	@echo "   make logs               Stream live logs from all backend services (Django, Celery Worker & Beat)"
+	@echo "   make logs-app           Stream Django/Gunicorn application logs"
+	@echo "   make logs-celery        Stream Celery background worker & scheduler logs"
+	@echo "   make logs-nginx         Stream Nginx access and error logs"
+	@echo "   make logs-infra         Stream Docker PostgreSQL (port 5434) and Redis logs"
+	@echo "   make logs-file          Tail application log files in ./logs/"
 	@echo ""
 	@echo " Deployment & Maintenance:"
 	@echo "   make deploy-local       Execute deploy_production.sh script locally on server"
@@ -149,7 +158,56 @@ dev-docker-down:
 	cd sbp_fms && docker compose down
 
 # ------------------------------------------------------------------------------
-# 7. DEPLOYMENT & MAINTENANCE
+# 7. LOGGING & MONITORING
+# ------------------------------------------------------------------------------
+logs:
+	@echo "==> Streaming live logs from all SBP-FMS systemd services (Ctrl+C to exit)..."
+	@if command -v journalctl &>/dev/null && systemctl is-active --quiet sbp-fms 2>/dev/null; then \
+		journalctl -u sbp-fms -u sbp-fms-celery -u sbp-fms-celery-beat -f --no-hostname -o short-iso; \
+	elif [ -d logs ] && ls logs/*.log &>/dev/null; then \
+		tail -f -n 50 logs/*.log; \
+	else \
+		docker compose -f docker-compose.prod.yml logs -f; \
+	fi
+
+logs-app:
+	@echo "==> Streaming Django Gunicorn application logs..."
+	@if command -v journalctl &>/dev/null && systemctl is-active --quiet sbp-fms 2>/dev/null; then \
+		journalctl -u sbp-fms -f -n 100 --no-hostname -o short-iso; \
+	elif [ -f logs/gunicorn_error.log ]; then \
+		tail -f -n 100 logs/gunicorn_error.log logs/gunicorn_access.log; \
+	else \
+		echo "No Gunicorn systemd service or local log files found."; \
+	fi
+
+logs-celery:
+	@echo "==> Streaming Celery worker & beat scheduler logs..."
+	@if command -v journalctl &>/dev/null && systemctl is-active --quiet sbp-fms-celery 2>/dev/null; then \
+		journalctl -u sbp-fms-celery -u sbp-fms-celery-beat -f -n 100 --no-hostname -o short-iso; \
+	elif [ -f logs/celery_worker.log ]; then \
+		tail -f -n 100 logs/celery_worker.log logs/celery_beat.log; \
+	else \
+		echo "No Celery systemd service or local log files found."; \
+	fi
+
+logs-nginx:
+	@echo "==> Streaming Nginx access & error logs..."
+	@if [ -f /var/log/nginx/access.log ]; then \
+		sudo tail -f -n 100 /var/log/nginx/access.log /var/log/nginx/error.log; \
+	else \
+		echo "Nginx log directory /var/log/nginx/ not found on this machine."; \
+	fi
+
+logs-infra: infra-logs
+
+logs-file:
+	@echo "==> Streaming application file logs in logs/ directory..."
+	@mkdir -p logs
+	@touch logs/gunicorn_access.log logs/gunicorn_error.log logs/celery_worker.log logs/celery_beat.log
+	tail -f -n 50 logs/*.log
+
+# ------------------------------------------------------------------------------
+# 8. DEPLOYMENT & MAINTENANCE
 # ------------------------------------------------------------------------------
 deploy-local:
 	@echo "==> Running server deployment script..."

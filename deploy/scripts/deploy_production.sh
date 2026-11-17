@@ -18,6 +18,9 @@ PROJECT_DIR="/home/sbpafrica/sbp_fms_django_backend"
 
 cd "$PROJECT_DIR"
 
+# Ensure logs directory exists for Gunicorn and Celery logfiles
+mkdir -p "$PROJECT_DIR/logs"
+
 # 1. Ensure .env exists
 if [ ! -f ".env" ]; then
   if [ -f ".env.production" ]; then
