@@ -718,7 +718,12 @@ class BillingService:
 
             try:
                 if event_name == 'charge.success' and reference:
-                    cls.verify_and_activate_subscription(reference=reference)
+                    metadata = event_data.get('metadata') or {}
+                    if metadata.get('type') == 'invoice_payment' or reference.startswith('inv_'):
+                        from apps.receivables.services import ReceivablesService
+                        ReceivablesService.verify_invoice_paystack_payment(reference=reference)
+                    else:
+                        cls.verify_and_activate_subscription(reference=reference)
 
                 webhook_log.processed = True
                 webhook_log.error_message = ''

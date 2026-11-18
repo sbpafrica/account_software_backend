@@ -1,3 +1,6 @@
+import re
+import uuid
+import logging
 from decimal import Decimal
 from django.db import transaction
 from django.core.exceptions import ValidationError
@@ -9,6 +12,8 @@ from .models import (
     Client, ClientInvoice, ClientInvoiceStatus,
     ClientInvoiceLine, PaymentReceipt, PaymentReceiptStatus, ReceiptAllocation
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _get_or_create_account(code: str, name: str, acct_type: str, country_code: str = 'GH') -> Account:
@@ -324,4 +329,138 @@ class ReceivablesService:
         transaction.on_commit(lambda: send_payment_receipt_email_task.delay(rec_id))
 
         return receipt
+
+    @staticmethod
+    def initialize_invoice_paystack_payment(
+        *,
+        invoice_id,
+        amount: Decimal = None,
+        callback_url: str = None,
+        user=None
+    ) -> tuple[ClientInvoice, dict]:
+        """
+        Initializes an online checkout payment with Paystack for a Client Invoice.
+        Validates invoice payable status and balance due before initiating session.
+        """
+        invoice = ClientInvoice.objects.select_related('client').get(id=invoice_id)
+        if invoice.status in [ClientInvoiceStatus.DRAFT, ClientInvoiceStatus.CANCELLED, ClientInvoiceStatus.VOIDED]:
+            raise ValidationError(f"Cannot pay invoice in '{invoice.status}' status. Invoice must be approved or issued.")
+        if invoice.balance_due <= Decimal('0.0000'):
+            raise ValidationError(f"Invoice {invoice.invoice_number} is already fully paid.")
+
+        pay_amount = amount if (amount and amount > Decimal('0.0000')) else invoice.balance_due
+        if pay_amount > invoice.balance_due:
+            raise ValidationError(f"Payment amount ({pay_amount}) cannot exceed invoice balance due ({invoice.balance_due}).")
+
+        from apps.organizations.paystack import PaystackService
+        reference = f"inv_{invoice.id.hex[:8]}_{uuid.uuid4().hex[:8]}"
+        email = invoice.client.email or (user.email if user else f"billing@{invoice.client.code.lower()}.com")
+
+        paystack_data = PaystackService.initialize_transaction(
+            email=email,
+            amount=pay_amount,
+            currency='GHS',
+            reference=reference,
+            callback_url=callback_url,
+            metadata={
+                'type': 'invoice_payment',
+                'invoice_id': str(invoice.id),
+                'invoice_number': invoice.invoice_number,
+                'client_id': str(invoice.client.id),
+                'amount': str(pay_amount),
+            }
+        )
+        return invoice, paystack_data
+
+    @staticmethod
+    @transaction.atomic
+    def verify_invoice_paystack_payment(*, reference: str, user=None) -> tuple[PaymentReceipt, ClientInvoice, bool]:
+        """
+        Verifies invoice transaction status with Paystack and creates payment receipt atomically.
+        Idempotent: If transaction was already processed, returns the existing receipt safely.
+        """
+        # Idempotency check: see if receipt was already recorded for this reference
+        existing_receipt = PaymentReceipt.objects.filter(reference_number=reference).select_related('client', 'bank_account').first()
+        if existing_receipt:
+            alloc = existing_receipt.allocations.first()
+            inv = alloc.invoice if alloc else None
+            return existing_receipt, inv, True
+
+        from apps.organizations.paystack import PaystackService
+        paystack_data = PaystackService.verify_transaction(reference=reference)
+        paystack_status = str(paystack_data.get('status', '')).lower()
+
+        if paystack_status != 'success':
+            return None, None, False
+
+        metadata = paystack_data.get('metadata') or {}
+        invoice_id = metadata.get('invoice_id')
+        if not invoice_id:
+            m = re.match(r'^inv_([0-9a-f]{8})_', reference)
+            if m:
+                inv_match = ClientInvoice.objects.filter(id__startswith=m.group(1)).first()
+                if inv_match:
+                    invoice_id = str(inv_match.id)
+
+        if not invoice_id:
+            raise ValidationError(f"Paystack transaction {reference} missing invoice_id metadata.")
+
+        invoice = ClientInvoice.objects.select_for_update().get(id=invoice_id)
+
+        # Paystack returns amount in subunit (pesewas/kobo -> divide by 100)
+        amount_subunits = paystack_data.get('amount', 0)
+        amount_received = Decimal(str(amount_subunits)) / Decimal('100.00')
+
+        # Resolve or auto-create Paystack clearing bank account
+        from apps.treasury.models import BankAccount
+        bank_acct = BankAccount.objects.filter(
+            bank_name__icontains='Paystack', country_code=invoice.client.country_code, is_active=True
+        ).first()
+        if not bank_acct:
+            bank_acct = BankAccount.objects.filter(country_code=invoice.client.country_code, is_active=True).first()
+
+        if not bank_acct:
+            gl_acct = _get_or_create_account(
+                '1030-PAYSTACK-CLEARING',
+                'Paystack Settlement Clearing Account',
+                AccountType.ASSET,
+                invoice.client.country_code
+            )
+            bank_acct, _ = BankAccount.objects.get_or_create(
+                account_number=f"PAYSTACK-{invoice.client.country_code}",
+                defaults={
+                    'bank_name': 'Paystack Payment Gateway',
+                    'branch_name': 'Online Payments',
+                    'currency': 'GHS',
+                    'country_code': invoice.client.country_code,
+                    'gl_account': gl_acct,
+                    'is_active': True,
+                }
+            )
+
+        alloc_amount = min(amount_received, invoice.balance_due)
+        receipt_num = f"PAYSTACK-{reference[-10:].upper()}"
+
+        effective_user = user or invoice.created_by or invoice.approved_by
+        if effective_user is None:
+            from django.contrib.auth import get_user_model
+            UserModel = get_user_model()
+            effective_user = UserModel.objects.filter(is_superuser=True).first() or UserModel.objects.first()
+
+        receipt = ReceivablesService.receipt_create_and_allocate(
+            receipt_number=receipt_num,
+            client_id=invoice.client.id,
+            amount_received=amount_received,
+            bank_account_id=bank_acct.id,
+            payment_method='PAYSTACK',
+            reference_number=reference,
+            description=f"Paystack payment for Invoice {invoice.invoice_number} (Ref: {reference})",
+            allocations_data=[{'invoice_id': str(invoice.id), 'amount': alloc_amount}],
+            user=effective_user
+        )
+
+        invoice.refresh_from_db()
+        logger.info("Invoice %s paid via Paystack ref %s (Receipt %s)", invoice.invoice_number, reference, receipt.receipt_number)
+        return receipt, invoice, True
+
 

@@ -7,6 +7,7 @@ from apps.common.schema_views import (
     SpectacularYAMLExportView,
     SpectacularDownloadView
 )
+from apps.organizations.api.views import PaystackWebhookPublicApi
 
 def health_check(request):
     return JsonResponse({'status': 'ok', 'service': 'sbp-fms-api', 'version': '3.0.0'})
@@ -30,6 +31,7 @@ urlpatterns = [
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
     # SBP-FMS Domain Apps
+    path('api/v1/paystack/webhook/', PaystackWebhookPublicApi.as_view(), name='unified-paystack-webhook'),
     path('api/v1/organizations/', include('apps.organizations.api.urls')),
     path('api/v1/users/', include('apps.users.api.urls')),
     path('api/v1/ledger/', include('apps.ledger.api.urls')),

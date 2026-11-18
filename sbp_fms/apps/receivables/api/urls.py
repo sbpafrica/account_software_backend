@@ -9,9 +9,18 @@ from apps.receivables.api.admin import (
     AgingReportAdminApi
 )
 
+from apps.receivables.api.paystack_views import (
+    InvoicePaystackInitializeApi,
+    InvoicePaystackVerifyApi,
+)
+
 urlpatterns = [
     # Public Client Facing
     path('public/clients/<uuid:client_id>/invoices/', ClientInvoiceListPublicApi.as_view(), name='client-invoices-public'),
+
+    # Paystack Invoice Checkout & Payment Verification (Idempotent & Atomic)
+    path('invoices/<uuid:invoice_id>/paystack/initialize/', InvoicePaystackInitializeApi.as_view(), name='invoice-paystack-initialize'),
+    path('invoices/paystack/verify/', InvoicePaystackVerifyApi.as_view(), name='invoice-paystack-verify'),
 
     # Admin / Clients & Statements
     path('admin/clients/', ClientListAdminApi.as_view(), name='client-list-admin'),

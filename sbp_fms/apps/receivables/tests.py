@@ -1,10 +1,15 @@
+import hmac
+import hashlib
+import json
 import pytest
 from decimal import Decimal
+from unittest.mock import patch
+from django.conf import settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 from apps.users.models import User
-from apps.receivables.models import Client, ClientInvoice, ClientInvoiceStatus
+from apps.receivables.models import Client, ClientInvoice, ClientInvoiceStatus, PaymentReceipt
 
 
 @pytest.fixture
@@ -174,4 +179,167 @@ class TestReceivablesCRUD:
         assert res_stmt.status_code == status.HTTP_200_OK
         assert len(res_stmt.data["data"]["transactions"]) == 2
         assert Decimal(str(res_stmt.data["data"]["closing_balance"])) == Decimal("0.0000")
+
+
+@pytest.mark.django_db
+class TestReceivablesPaystackPayment:
+    """
+    Tests Paystack online payment for Client Invoices:
+    1. Checkout initialization with idempotency.
+    2. Synchronous verification with atomic double-entry GL posting.
+    3. Idempotent re-verification.
+    """
+
+    @patch('apps.organizations.paystack.PaystackService.initialize_transaction')
+    def test_invoice_paystack_initialize_and_idempotency(self, mock_init, api_client, superuser):
+        api_client.force_authenticate(user=superuser)
+
+        client = Client.objects.create(name="Paystack Test Client", code="CL-PSTK-001", country_code="GH")
+        inv = ClientInvoice.objects.create(
+            invoice_number="INV-PSTK-001",
+            client=client,
+            issue_date="2026-11-01",
+            due_date="2026-11-30",
+            total_amount=Decimal("1500.0000"),
+            amount_paid=Decimal("0.0000"),
+            status=ClientInvoiceStatus.ISSUED
+        )
+
+        mock_ref = f"inv_{inv.id.hex[:8]}_test123"
+        mock_init.return_value = {
+            'authorization_url': 'https://checkout.paystack.com/auth_mock',
+            'access_code': 'mock_access_code',
+            'reference': mock_ref
+        }
+
+        url = reverse("invoice-paystack-initialize", kwargs={"invoice_id": str(inv.id)})
+        idemp_key = "idemp_inv_init_test_001"
+
+        # 1. Initialize checkout
+        res = api_client.post(url, {"amount": 1500.0}, format="json", HTTP_IDEMPOTENCY_KEY=idemp_key)
+        assert res.status_code == status.HTTP_201_CREATED
+        assert res.data["data"]["authorization_url"] == "https://checkout.paystack.com/auth_mock"
+        assert res.data["data"]["reference"] == mock_ref
+
+        # 2. Idempotent replay: Calling again with same key returns cached response
+        res_replay = api_client.post(url, {"amount": 1500.0}, format="json", HTTP_IDEMPOTENCY_KEY=idemp_key)
+        assert res_replay.status_code == status.HTTP_201_CREATED
+        assert res_replay.get("X-Idempotency-Replay") == "true"
+        assert res_replay.data["data"]["reference"] == mock_ref
+
+    @patch('apps.organizations.paystack.PaystackService.verify_transaction')
+    def test_invoice_paystack_verify_and_atomic_gl_posting(self, mock_verify, api_client, superuser):
+        api_client.force_authenticate(user=superuser)
+
+        client = Client.objects.create(name="Paystack Verify Client", code="CL-PSTK-002", country_code="GH")
+        inv = ClientInvoice.objects.create(
+            invoice_number="INV-PSTK-002",
+            client=client,
+            issue_date="2026-11-01",
+            due_date="2026-11-30",
+            total_amount=Decimal("2000.0000"),
+            amount_paid=Decimal("0.0000"),
+            status=ClientInvoiceStatus.ISSUED
+        )
+
+        mock_ref = f"inv_{inv.id.hex[:8]}_verify_success"
+        mock_verify.return_value = {
+            'status': 'success',
+            'amount': 200000,  # 2000.00 GHS in pesewas
+            'currency': 'GHS',
+            'reference': mock_ref,
+            'metadata': {
+                'invoice_id': str(inv.id),
+                'client_id': str(client.id)
+            }
+        }
+
+        url = reverse("invoice-paystack-verify")
+        idemp_key = "idemp_inv_ver_test_002"
+
+        # 1. Verify payment
+        res = api_client.post(url, {"reference": mock_ref}, format="json", HTTP_IDEMPOTENCY_KEY=idemp_key)
+        assert res.status_code == status.HTTP_200_OK
+        assert res.data["data"]["status"] == "SUCCESS"
+
+        inv.refresh_from_db()
+        assert inv.status == ClientInvoiceStatus.PAID
+        assert inv.amount_paid == Decimal("2000.0000")
+        assert inv.balance_due == Decimal("0.0000")
+
+        # Verify PaymentReceipt was created with balanced GL Journal
+        receipt = PaymentReceipt.objects.get(reference_number=mock_ref)
+        assert receipt.payment_method == "PAYSTACK"
+        assert receipt.amount_received == Decimal("2000.0000")
+        assert receipt.journal_entry is not None
+        assert receipt.journal_entry.source_module == "RECEIVABLES"
+
+        # 2. Idempotent re-verification returns cached/confirmed result
+        res_dup = api_client.post(url, {"reference": mock_ref}, format="json", HTTP_IDEMPOTENCY_KEY=idemp_key)
+        assert res_dup.status_code == status.HTTP_200_OK
+        assert res_dup.get("X-Idempotency-Replay") == "true"
+
+    @patch('apps.organizations.paystack.PaystackService.verify_transaction')
+    def test_paystack_webhook_invoice_payment_routing_and_deduplication(self, mock_verify, api_client):
+        client = Client.objects.create(name="Webhook Client", code="CL-PSTK-003", country_code="GH")
+        inv = ClientInvoice.objects.create(
+            invoice_number="INV-PSTK-003",
+            client=client,
+            issue_date="2026-11-01",
+            due_date="2026-11-30",
+            total_amount=Decimal("3500.0000"),
+            amount_paid=Decimal("0.0000"),
+            status=ClientInvoiceStatus.ISSUED
+        )
+
+        mock_ref = f"inv_{inv.id.hex[:8]}_webhook_charge"
+        mock_verify.return_value = {
+            'status': 'success',
+            'amount': 350000,
+            'currency': 'GHS',
+            'reference': mock_ref,
+            'metadata': {'type': 'invoice_payment', 'invoice_id': str(inv.id), 'client_id': str(client.id)}
+        }
+
+        webhook_payload = {
+            'event': 'charge.success',
+            'id': f'evt_{inv.id.hex[:10]}',
+            'data': {
+                'id': 1234567,
+                'status': 'success',
+                'reference': mock_ref,
+                'amount': 350000,
+                'currency': 'GHS',
+                'metadata': {'type': 'invoice_payment', 'invoice_id': str(inv.id)}
+            }
+        }
+        raw_body = json.dumps(webhook_payload).encode('utf-8')
+        secret = getattr(settings, 'PAYSTACK_SECRET_KEY', 'sk_test_mock_paystack_secret_key')
+        sig = hmac.new(secret.encode('utf-8'), raw_body, hashlib.sha512).hexdigest()
+
+        webhook_url = reverse("unified-paystack-webhook")
+
+        # 1. First delivery: Processed
+        res = api_client.post(
+            webhook_url,
+            data=raw_body,
+            content_type="application/json",
+            HTTP_X_PAYSTACK_SIGNATURE=sig
+        )
+        assert res.status_code == status.HTTP_200_OK
+
+        inv.refresh_from_db()
+        assert inv.status == ClientInvoiceStatus.PAID
+        assert inv.balance_due == Decimal("0.0000")
+
+        # 2. Second duplicate delivery (Webhook replay): Acknowledged idempotently without duplicate receipt
+        res_dup = api_client.post(
+            webhook_url,
+            data=raw_body,
+            content_type="application/json",
+            HTTP_X_PAYSTACK_SIGNATURE=sig
+        )
+        assert res_dup.status_code == status.HTTP_200_OK
+        assert res_dup.data["data"]["status"] == "ignored"
+
 

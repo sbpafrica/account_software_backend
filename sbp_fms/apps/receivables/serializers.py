@@ -141,3 +141,29 @@ class CustomerStatementOutputSerializer(serializers.Serializer):
     closing_balance = serializers.DecimalField(max_digits=18, decimal_places=4)
     transactions = CustomerStatementTransactionSerializer(many=True)
 
+
+class InvoicePaystackInitializeInputSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=18, decimal_places=4, required=False, allow_null=True, help_text="Amount to pay. Defaults to invoice balance due.")
+    callback_url = serializers.URLField(required=False, allow_null=True, help_text="Frontend redirection URL after Paystack checkout completion.")
+
+
+class InvoicePaystackInitializeOutputSerializer(serializers.Serializer):
+    authorization_url = serializers.URLField(help_text="Paystack secure checkout URL to redirect the user to.")
+    access_code = serializers.CharField(help_text="Paystack checkout access code.")
+    reference = serializers.CharField(help_text="Unique transaction reference sent to Paystack.")
+    amount = serializers.DecimalField(max_digits=18, decimal_places=4)
+    currency = serializers.CharField()
+    invoice_number = serializers.CharField()
+
+
+class InvoicePaystackVerifyInputSerializer(serializers.Serializer):
+    reference = serializers.CharField(max_length=100, help_text="Paystack transaction reference received upon checkout completion.")
+
+
+class InvoicePaystackVerifyOutputSerializer(serializers.Serializer):
+    status = serializers.CharField()
+    message = serializers.CharField()
+    receipt = PaymentReceiptOutputSerializer(allow_null=True)
+    invoice = ClientInvoiceOutputSerializer(allow_null=True)
+
+

@@ -133,6 +133,20 @@ class LedgerService:
                 f"Double-entry balance check failed! Debits ({total_debits}) != Credits ({total_credits}). Imbalance: {diff}"
             )
 
+        if user is None:
+            from django.contrib.auth import get_user_model
+            UserModel = get_user_model()
+            user = UserModel.objects.filter(is_superuser=True).first() or UserModel.objects.first()
+            if user is None:
+                user, _ = UserModel.objects.get_or_create(
+                    email="system@sbp-africa.com",
+                    defaults={
+                        'first_name': 'System',
+                        'last_name': 'Automator',
+                        'is_active': True,
+                    }
+                )
+
         entry = JournalEntry.objects.create(
             entry_number=entry_number,
             posting_date=posting_date,

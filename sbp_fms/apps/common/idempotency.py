@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 from datetime import timedelta
+from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
@@ -74,8 +75,14 @@ def idempotent_endpoint(expire_hours: int = 24):
                         'X-Idempotency-Replay': 'true',
                         'X-Idempotency-Key': idempotency_key
                     }
+                    body = record.response_body
+                    if isinstance(body, str):
+                        try:
+                            body = json.loads(body)
+                        except Exception:
+                            pass
                     return Response(
-                        data=record.response_body,
+                        data=body,
                         status=record.response_status_code or status.HTTP_200_OK,
                         headers=response_headers
                     )
@@ -110,12 +117,11 @@ def idempotent_endpoint(expire_hours: int = 24):
                 # Persist completed response
                 resp_data = getattr(response, 'data', None)
                 record.response_status_code = response.status_code
-                # Ensure data is serializable for JSONField
                 try:
-                    json.dumps(resp_data)
-                    record.response_body = resp_data
+                    serialized = json.dumps(resp_data, cls=DjangoJSONEncoder)
+                    record.response_body = json.loads(serialized)
                 except Exception:
-                    record.response_body = str(resp_data)
+                    record.response_body = resp_data
                 record.is_processing = False
                 record.save(update_fields=['response_status_code', 'response_body', 'is_processing', 'updated_at'])
 
