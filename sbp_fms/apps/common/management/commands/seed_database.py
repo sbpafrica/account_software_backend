@@ -577,13 +577,13 @@ class Command(BaseCommand):
         today = datetime.date(2026, 1, 1)
 
         tax_rules = [
-            # Ghana (GH) GRA PAYE Progressive Brackets
-            ('GH', TaxType.PAYE, Decimal('0.0000'), Decimal('490.0000'), Decimal('0.0000')),
-            ('GH', TaxType.PAYE, Decimal('490.0000'), Decimal('600.0000'), Decimal('0.0500')),
-            ('GH', TaxType.PAYE, Decimal('600.0000'), Decimal('730.0000'), Decimal('0.1000')),
-            ('GH', TaxType.PAYE, Decimal('730.0000'), Decimal('3896.6700'), Decimal('0.1750')),
-            ('GH', TaxType.PAYE, Decimal('3896.6700'), Decimal('20000.0000'), Decimal('0.2500')),
-            ('GH', TaxType.PAYE, Decimal('20000.0000'), Decimal('50000.0000'), Decimal('0.3000')),
+            # Ghana (GH) GRA PAYE Progressive Brackets (Graduated Schedule)
+            ('GH', TaxType.PAYE, Decimal('0.0000'), Decimal('588.0000'), Decimal('0.0000')),
+            ('GH', TaxType.PAYE, Decimal('588.0000'), Decimal('668.0000'), Decimal('0.0500')),
+            ('GH', TaxType.PAYE, Decimal('668.0000'), Decimal('768.0000'), Decimal('0.1000')),
+            ('GH', TaxType.PAYE, Decimal('768.0000'), Decimal('3668.0000'), Decimal('0.1750')),
+            ('GH', TaxType.PAYE, Decimal('3668.0000'), Decimal('19668.0000'), Decimal('0.2500')),
+            ('GH', TaxType.PAYE, Decimal('19668.0000'), Decimal('50000.0000'), Decimal('0.3000')),
             ('GH', TaxType.PAYE, Decimal('50000.0000'), None, Decimal('0.3500')),
 
             # Ghana SSNIT Tier 1

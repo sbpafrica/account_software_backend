@@ -122,4 +122,41 @@ class TestTaxationCRUD:
         assert Decimal(str(vat_data["output_tax_total"])) == Decimal("219.0000")
         assert Decimal(str(vat_data["net_vat_payable"])) == Decimal("219.0000")
 
+    def test_ghana_paye_graduated_brackets_match_excel_formula(self):
+        from apps.taxation.engines import GhanaTaxEngine
+
+        # Excel formula:
+        # =ROUND(IF(W2<588,0,IF(W2<668,5%*(W2-588),IF(W2<768,10%*(W2-668)+4,
+        #        IF(W2<3668,17.5%*(W2-768)+14,IF(W2<19668,25%*(W2-3668)+521.5,
+        #        IF(W2<50000,30%*(W2-19668)+4521.5,35%*(W2-50000)+13621.1)))))), 2)
+
+        # 1. Below 588 -> 0 tax
+        res1 = GhanaTaxEngine.calculate_paye(Decimal("500.00"))
+        assert res1["paye_tax"] == Decimal("0.00")
+
+        # 2. Between 588 and 668: W2 = 600 -> 5% * (600 - 588) = 0.60
+        res2 = GhanaTaxEngine.calculate_paye(Decimal("600.00"))
+        assert res2["paye_tax"] == Decimal("0.60")
+
+        # 3. Between 668 and 768: W2 = 700 -> 10% * (700 - 668) + 4 = 3.20 + 4 = 7.20
+        res3 = GhanaTaxEngine.calculate_paye(Decimal("700.00"))
+        assert res3["paye_tax"] == Decimal("7.20")
+
+        # 4. Between 768 and 3668: W2 = 1000 -> 17.5% * (1000 - 768) + 14 = 40.60 + 14 = 54.60
+        res4 = GhanaTaxEngine.calculate_paye(Decimal("1000.00"))
+        assert res4["paye_tax"] == Decimal("54.60")
+
+        # 5. Between 3668 and 19668: W2 = 10000 -> 25% * (10000 - 3668) + 521.5 = 1583 + 521.5 = 2104.50
+        res5 = GhanaTaxEngine.calculate_paye(Decimal("10000.00"))
+        assert res5["paye_tax"] == Decimal("2104.50")
+
+        # 6. Between 19668 and 50000: W2 = 30000 -> 30% * (30000 - 19668) + 4521.5 = 3099.60 + 4521.5 = 7621.10
+        res6 = GhanaTaxEngine.calculate_paye(Decimal("30000.00"))
+        assert res6["paye_tax"] == Decimal("7621.10")
+
+        # 7. Exceeding 50000: W2 = 60000 -> 35% * (60000 - 50000) + 13621.1 = 3500 + 13621.1 = 17121.10
+        res7 = GhanaTaxEngine.calculate_paye(Decimal("60000.00"))
+        assert res7["paye_tax"] == Decimal("17121.10")
+
+
 
