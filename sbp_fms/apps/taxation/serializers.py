@@ -28,14 +28,38 @@ class TaxRuleUpdateInputSerializer(serializers.Serializer):
 
 
 class TaxCalculationInputSerializer(serializers.Serializer):
-    country_code = serializers.CharField(max_length=2, default='GH')
-    gross_salary = serializers.DecimalField(max_digits=18, decimal_places=4)
+    country_code = serializers.CharField(max_length=2, default='GH', required=False)
+    gross_salary = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
+    taxable_income = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
+
+    def validate(self, attrs):
+        if not attrs.get('gross_salary') and not attrs.get('taxable_income'):
+            raise serializers.ValidationError("Either 'gross_salary' or 'taxable_income' must be provided.")
+        return attrs
 
 
 class TaxCalculationOutputSerializer(serializers.Serializer):
     employee_ssnit = serializers.DecimalField(max_digits=18, decimal_places=4)
     employer_ssnit = serializers.DecimalField(max_digits=18, decimal_places=4)
     total_ssnit_liability = serializers.DecimalField(max_digits=18, decimal_places=4)
+
+
+class IndirectTaxCalculatorInputSerializer(serializers.Serializer):
+    taxable_value = serializers.DecimalField(max_digits=18, decimal_places=4)
+    include_covid_levy = serializers.BooleanField(default=True, required=False)
+
+
+class TaxCalculationOutputSerializer(serializers.Serializer):
+    country_code = serializers.CharField(max_length=2)
+    gross_salary = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
+    employee_ssnit = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
+    employer_ssnit = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
+    total_ssnit_liability = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
+    taxable_income = serializers.DecimalField(max_digits=18, decimal_places=4)
+    paye_tax = serializers.DecimalField(max_digits=18, decimal_places=4)
+    net_salary = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
+    effective_paye_rate_pct = serializers.DecimalField(max_digits=6, decimal_places=2, required=False)
+    paye_breakdown = serializers.ListField(child=serializers.DictField(), required=False)
 
 
 class IndirectTaxCalculatorInputSerializer(serializers.Serializer):

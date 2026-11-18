@@ -64,15 +64,36 @@ class TestTaxationCRUD:
 
     def test_public_tax_calculator(self, api_client):
         calc_url = reverse("tax-calculate-public")
+
+        # 1. Test calculation with gross salary (calculates SSNIT, Taxable Income, PAYE, and Net Pay)
         payload = {
             "country_code": "GH",
             "gross_salary": 10000.0
         }
         res = api_client.post(calc_url, payload, format="json")
         assert res.status_code == status.HTTP_200_OK
-        assert "employee_ssnit" in res.data["data"]
-        assert "employer_ssnit" in res.data["data"]
-        assert "total_ssnit_liability" in res.data["data"]
+        data = res.data["data"]
+        assert "employee_ssnit" in data
+        assert "employer_ssnit" in data
+        assert "taxable_income" in data
+        assert "paye_tax" in data
+        assert "net_salary" in data
+        assert "paye_breakdown" in data
+        # Gross = 10,000 -> Employee SSNIT (5.5%) = 550.00 -> Taxable Income = 9,450.00
+        assert Decimal(str(data["employee_ssnit"])) == Decimal("550.00")
+        assert Decimal(str(data["taxable_income"])) == Decimal("9450.00")
+
+        # 2. Test direct calculation with taxable income (W2)
+        payload_w2 = {
+            "country_code": "GH",
+            "taxable_income": 10000.0
+        }
+        res_w2 = api_client.post(calc_url, payload_w2, format="json")
+        assert res_w2.status_code == status.HTTP_200_OK
+        data_w2 = res_w2.data["data"]
+        # W2 = 10,000 -> PAYE = 2,104.50 (Matches Excel formula exactly!)
+        assert Decimal(str(data_w2["paye_tax"])) == Decimal("2104.50")
+        assert Decimal(str(data_w2["effective_paye_rate_pct"])) == Decimal("21.04")
 
     def test_indirect_tax_calculator_and_vat_return_summary(self, api_client, superuser):
         api_client.force_authenticate(user=superuser)
