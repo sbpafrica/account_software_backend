@@ -2,6 +2,11 @@ from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
+from apps.common.schema_views import (
+    SpectacularJSONExportView,
+    SpectacularYAMLExportView,
+    SpectacularDownloadView
+)
 
 def health_check(request):
     return JsonResponse({'status': 'ok', 'service': 'sbp-fms-api', 'version': '3.0.0'})
@@ -14,8 +19,13 @@ urlpatterns = [
     path('health/', health_check, name='health-check'),
     path('api/health/', health_check, name='api-health-check'),
 
-    # OpenAPI Documentation
+    # OpenAPI Documentation & Export Formats (JSON / YAML / Download)
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/schema.json', SpectacularJSONExportView.as_view(), name='schema-json'),
+    path('api/schema.yaml', SpectacularYAMLExportView.as_view(), name='schema-yaml'),
+    path('api/schema/json/', SpectacularJSONExportView.as_view(), name='schema-json-slash'),
+    path('api/schema/yaml/', SpectacularYAMLExportView.as_view(), name='schema-yaml-slash'),
+    path('api/schema/download/', SpectacularDownloadView.as_view(), name='schema-download'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 

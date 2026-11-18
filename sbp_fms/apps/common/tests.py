@@ -80,3 +80,35 @@ class TestCommonAuditAndDocuments:
         res_del = api_client.delete(del_url)
         assert res_del.status_code == status.HTTP_200_OK
         assert not DocumentAttachment.objects.filter(id=doc_id).exists()
+
+    def test_openapi_schema_formats_and_downloads(self, api_client):
+        # 1. JSON export endpoint
+        res_json = api_client.get(reverse("schema-json"))
+        assert res_json.status_code == status.HTTP_200_OK
+        assert "application/json" in res_json["Content-Type"]
+        assert "openapi" in res_json.json()
+
+        # 2. JSON download with attachment disposition
+        res_dl_json = api_client.get(reverse("schema-json") + "?download=1")
+        assert res_dl_json.status_code == status.HTTP_200_OK
+        assert "attachment" in res_dl_json["Content-Disposition"]
+
+        # 3. YAML export endpoint
+        res_yaml = api_client.get(reverse("schema-yaml"))
+        assert res_yaml.status_code == status.HTTP_200_OK
+        assert "yaml" in res_yaml["Content-Type"]
+
+        # 4. Download dispatcher endpoint
+        res_dl = api_client.get(reverse("schema-download") + "?format=json")
+        assert res_dl.status_code == status.HTTP_200_OK
+        assert "attachment" in res_dl["Content-Disposition"]
+
+        # 5. Swagger UI has download links rendered
+        res_docs = api_client.get(reverse("swagger-ui"))
+        assert res_docs.status_code == status.HTTP_200_OK
+        assert "Download JSON" in res_docs.content.decode()
+
+        # 6. ReDoc has download links rendered
+        res_redoc = api_client.get(reverse("redoc"))
+        assert res_redoc.status_code == status.HTTP_200_OK
+        assert "Download JSON" in res_redoc.content.decode()

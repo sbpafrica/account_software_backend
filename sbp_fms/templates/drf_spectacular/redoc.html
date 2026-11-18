@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>{{ title|default:"SBP-FMS API ReDoc" }}</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="{{ favicon_href }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&family=Roboto:wght@300;400;700&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+    /* Top Executive Header Bar */
+    .sbp-top-header {
+      background: linear-gradient(135deg, #102a43 0%, #243b53 100%);
+      color: #ffffff;
+      padding: 14px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    .sbp-brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .sbp-logo-badge {
+      background: #2563eb;
+      color: #ffffff;
+      font-weight: 900;
+      font-size: 1.1rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+      letter-spacing: 1px;
+    }
+    .sbp-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sbp-version-tag {
+      font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.18);
+      color: #e2e8f0;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+    .sbp-subtitle {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .sbp-actions-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .sbp-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: all 0.2s ease-in-out;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .sbp-btn-download-json {
+      background: #10b981;
+      color: #ffffff;
+    }
+    .sbp-btn-download-json:hover {
+      background: #059669;
+    }
+    .sbp-btn-download-yaml {
+      background: #6366f1;
+      color: #ffffff;
+    }
+    .sbp-btn-download-yaml:hover {
+      background: #4f46e5;
+    }
+    .sbp-btn-outline {
+      background: rgba(255, 255, 255, 0.1);
+      color: #f1f5f9;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .sbp-btn-outline:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    .sbp-btn-admin {
+      background: #475569;
+      color: #f8fafc;
+    }
+    .sbp-btn-admin:hover {
+      background: #334155;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Executive Navigation & Download Bar -->
+  <header class="sbp-top-header">
+    <div class="sbp-brand-section">
+      <div class="sbp-logo-badge">SBP</div>
+      <div>
+        <h1 class="sbp-title">
+          Financial Management System (SBP-FMS) - ReDoc
+          <span class="sbp-version-tag">OpenAPI 3.0 &bull; v3.0.0</span>
+        </h1>
+        <div class="sbp-subtitle">Multi-Country Ledger, Payroll Escrow & Statutory API Engine</div>
+      </div>
+    </div>
+
+    <div class="sbp-actions-group">
+      <!-- One-Click Direct Downloads -->
+      <a href="/api/schema.json?download=1" class="sbp-btn sbp-btn-download-json" download="sbp-fms-openapi-schema.json" title="Download OpenAPI specification in JSON format">
+        <i class="fas fa-file-arrow-down"></i> Download JSON
+      </a>
+      <a href="/api/schema.yaml?download=1" class="sbp-btn sbp-btn-download-yaml" download="sbp-fms-openapi-schema.yaml" title="Download OpenAPI specification in YAML format">
+        <i class="fas fa-file-code"></i> Download YAML
+      </a>
+      <a href="/api/docs/" class="sbp-btn sbp-btn-outline" title="Switch to Interactive Swagger UI">
+        <i class="fas fa-vial"></i> Interactive Swagger UI
+      </a>
+      <a href="/admin/" class="sbp-btn sbp-btn-admin" title="Open Executive Django Admin">
+        <i class="fas fa-gauge-high"></i> Admin Portal
+      </a>
+    </div>
+  </header>
+
+  <div id="redoc-container"></div>
+  <script src="{{ redoc_dist }}"></script>
+  <script>
+    const redocSettings = {{ settings|safe }};
+    Redoc.init("{{ schema_url }}", redocSettings, document.getElementById('redoc-container'));
+  </script>
+</body>
+</html>

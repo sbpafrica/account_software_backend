@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>{{ title|default:"SBP-FMS API Engine & Interactive Swagger Docs" }}</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="{{ favicon_href }}">
+  <link rel="stylesheet" href="{{ swagger_ui_css }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    html { box-sizing: border-box; overflow-y: scroll; }
+    *, *:after, *:before { box-sizing: inherit; }
+    body { background: #f8fafc; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+    /* Top Executive Header Bar */
+    .sbp-top-header {
+      background: linear-gradient(135deg, #102a43 0%, #243b53 100%);
+      color: #ffffff;
+      padding: 14px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    .sbp-brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .sbp-logo-badge {
+      background: #2563eb;
+      color: #ffffff;
+      font-weight: 900;
+      font-size: 1.1rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+      letter-spacing: 1px;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4);
+    }
+    .sbp-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sbp-version-tag {
+      font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.18);
+      color: #e2e8f0;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+    .sbp-subtitle {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .sbp-actions-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
+    }
+    @media (min-width: 992px) {
+      .sbp-actions-group { margin-top: 0; }
+    }
+    .sbp-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: all 0.2s ease-in-out;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .sbp-btn-download-json {
+      background: #10b981;
+      color: #ffffff;
+      box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+    }
+    .sbp-btn-download-json:hover {
+      background: #059669;
+      transform: translateY(-1px);
+      color: #ffffff;
+    }
+    .sbp-btn-download-yaml {
+      background: #6366f1;
+      color: #ffffff;
+      box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+    }
+    .sbp-btn-download-yaml:hover {
+      background: #4f46e5;
+      transform: translateY(-1px);
+      color: #ffffff;
+    }
+    .sbp-btn-outline {
+      background: rgba(255, 255, 255, 0.1);
+      color: #f1f5f9;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .sbp-btn-outline:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+    }
+    .sbp-btn-copy {
+      background: #0284c7;
+      color: #ffffff;
+    }
+    .sbp-btn-copy:hover {
+      background: #0369a1;
+    }
+    .sbp-btn-admin {
+      background: #475569;
+      color: #f8fafc;
+    }
+    .sbp-btn-admin:hover {
+      background: #334155;
+    }
+
+    /* Frontend Developer Quick Guide Accordion */
+    .sbp-dev-guide {
+      background: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #334155;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .sbp-dev-guide-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+    .sbp-pill-code {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #0f172a;
+      font-size: 0.82rem;
+      user-select: all;
+    }
+
+    /* Swagger UI Fine-tuning */
+    .swagger-ui .topbar { display: none !important; }
+    .swagger-ui .info { margin: 24px 0 16px 0; }
+    .swagger-ui .info .title { color: #0f172a; font-size: 2rem; font-weight: 700; }
+    .swagger-ui .scheme-container { background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.06); padding: 16px 0; }
+    
+    /* Copy feedback toast */
+    #copy-toast {
+      visibility: hidden;
+      min-width: 250px;
+      background-color: #0f172a;
+      color: #fff;
+      text-align: center;
+      border-radius: 8px;
+      padding: 12px 16px;
+      position: fixed;
+      z-index: 9999;
+      right: 24px;
+      bottom: 24px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+      opacity: 0;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    #copy-toast.show {
+      visibility: visible;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Executive Navigation & Download Bar -->
+  <header class="sbp-top-header">
+    <div class="sbp-brand-section">
+      <div class="sbp-logo-badge">SBP</div>
+      <div>
+        <h1 class="sbp-title">
+          Financial Management System (SBP-FMS)
+          <span class="sbp-version-tag">OpenAPI 3.0 &bull; v3.0.0</span>
+        </h1>
+        <div class="sbp-subtitle">Multi-Country Ledger, Payroll Escrow & Statutory API Engine</div>
+      </div>
+    </div>
+
+    <div class="sbp-actions-group">
+      <!-- One-Click Direct Downloads -->
+      <a href="/api/schema.json?download=1" class="sbp-btn sbp-btn-download-json" download="sbp-fms-openapi-schema.json" title="Download OpenAPI specification in JSON format">
+        <i class="fas fa-file-arrow-down"></i> Download JSON
+      </a>
+      <a href="/api/schema.yaml?download=1" class="sbp-btn sbp-btn-download-yaml" download="sbp-fms-openapi-schema.yaml" title="Download OpenAPI specification in YAML format">
+        <i class="fas fa-file-code"></i> Download YAML
+      </a>
+      
+      <!-- Copy Endpoint URL -->
+      <button onclick="copySchemaUrl()" class="sbp-btn sbp-btn-copy" title="Copy OpenAPI JSON URL to clipboard for code generation (Orval, RTK, Postman)">
+        <i class="fas fa-copy"></i> <span id="copy-btn-text">Copy JSON URL</span>
+      </button>
+
+      <!-- Navigation Links -->
+      <a href="/api/redoc/" class="sbp-btn sbp-btn-outline" title="Open ReDoc documentation view">
+        <i class="fas fa-book-open"></i> ReDoc View
+      </a>
+      <a href="/admin/" class="sbp-btn sbp-btn-admin" title="Open Executive Django Admin">
+        <i class="fas fa-gauge-high"></i> Admin Portal
+      </a>
+    </div>
+  </header>
+
+  <!-- Frontend Developer Quick Guide Bar -->
+  <div class="sbp-dev-guide">
+    <div class="sbp-dev-guide-links">
+      <span><i class="fas fa-terminal text-primary mr-1"></i> <strong>Frontend SDK Codegen URL:</strong></span>
+      <span class="sbp-pill-code" id="schema-direct-url">/api/schema.json</span>
+      <span style="color: #64748b;">|</span>
+      <span><strong>Formats Available:</strong></span>
+      <a href="/api/schema.json" target="_blank" style="color: #0284c7; text-decoration: underline; font-weight: 600;">Raw JSON</a> &bull;
+      <a href="/api/schema.yaml" target="_blank" style="color: #6366f1; text-decoration: underline; font-weight: 600;">Raw YAML</a> &bull;
+      <a href="/api/schema/" target="_blank" style="color: #475569; text-decoration: underline;">Auto (Content-Negotiated)</a>
+    </div>
+    <div style="color: #64748b; font-size: 0.8rem;">
+      <i class="fas fa-shield-alt text-success"></i> JWT Bearer Auth &bull; Idempotency Supported
+    </div>
+  </div>
+
+  <!-- Swagger UI Mount Container -->
+  <div id="swagger-ui"></div>
+
+  <!-- Toast notification for copy action -->
+  <div id="copy-toast">
+    <i class="fas fa-check-circle text-success" style="color: #10b981; margin-right: 6px;"></i>
+    OpenAPI JSON URL copied to clipboard!
+  </div>
+
+  <!-- Swagger UI Scripts -->
+  <script src="{{ swagger_ui_bundle }}"></script>
+  <script src="{{ swagger_ui_standalone }}"></script>
+
+  <script>
+    "use strict";
+
+    // Clipboard copy function for frontend devs
+    function copySchemaUrl() {
+      const fullUrl = window.location.origin + '/api/schema.json';
+      navigator.clipboard.writeText(fullUrl).then(() => {
+        const toast = document.getElementById("copy-toast");
+        toast.className = "show";
+        const btnText = document.getElementById("copy-btn-text");
+        btnText.innerText = "Copied!";
+        setTimeout(() => {
+          toast.className = toast.className.replace("show", "");
+          btnText.innerText = "Copy JSON URL";
+        }, 3000);
+      }).catch(err => {
+        console.error("Failed to copy URL: ", err);
+      });
+    }
+
+    // Set schema URL in dev guide
+    document.addEventListener("DOMContentLoaded", function() {
+      const el = document.getElementById("schema-direct-url");
+      if (el) {
+        el.innerText = window.location.origin + '/api/schema.json';
+      }
+    });
+
+    const swaggerSettings = {{ settings|safe }};
+    const schemaAuthNames = {{ schema_auth_names|safe }};
+    let schemaAuthFailed = false;
+    const plugins = [];
+
+    const reloadSchemaOnAuthChange = () => {
+      return {
+        statePlugins: {
+          auth: {
+            wrapActions: {
+              authorizeOauth2:(ori) => (...args) => {
+                schemaAuthFailed = false;
+                setTimeout(() => ui.specActions.download());
+                return ori(...args);
+              },
+              authorize: (ori) => (...args) => {
+                schemaAuthFailed = false;
+                setTimeout(() => ui.specActions.download());
+                return ori(...args);
+              },
+              logout: (ori) => (...args) => {
+                schemaAuthFailed = false;
+                setTimeout(() => ui.specActions.download());
+                return ori(...args);
+              },
+            },
+          },
+        },
+      };
+    };
+
+    if (schemaAuthNames.length > 0) {
+      plugins.push(reloadSchemaOnAuthChange);
+    }
+
+    const uiInitialized = () => {
+      try {
+        ui;
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const isSchemaUrl = (url) => {
+      if (!uiInitialized()) {
+        return false;
+      }
+      return url === new URL(ui.getConfigs().url, document.baseURI).href;
+    };
+
+    const responseInterceptor = (response, ...args) => {
+      if (!response.ok && isSchemaUrl(response.url)) {
+        console.warn("schema request received '" + response.status + "'. disabling credentials for schema till logout.");
+        if (!schemaAuthFailed) {
+          schemaAuthFailed = true;
+          setTimeout(() => ui.specActions.download());
+        }
+      }
+      return response;
+    };
+
+    const injectAuthCredentials = (request) => {
+      let authorized;
+      if (uiInitialized()) {
+        const state = ui.getState().get("auth").get("authorized");
+        if (state !== undefined && Object.keys(state.toJS()).length !== 0) {
+          authorized = state.toJS();
+        }
+      } else if (![undefined, "{}"].includes(localStorage.authorized)) {
+        authorized = JSON.parse(localStorage.authorized);
+      }
+      if (authorized === undefined) {
+        return;
+      }
+      for (const authName of schemaAuthNames) {
+        const authDef = authorized[authName];
+        if (authDef === undefined || authDef.schema === undefined) {
+          continue;
+        }
+        if (authDef.schema.type === "http" && authDef.schema.scheme === "bearer") {
+          request.headers["Authorization"] = "Bearer " + authDef.value;
+          return;
+        } else if (authDef.schema.type === "http" && authDef.schema.scheme === "basic") {
+          request.headers["Authorization"] = "Basic " + btoa(authDef.value.username + ":" + authDef.value.password);
+          return;
+        } else if (authDef.schema.type === "apiKey" && authDef.schema.in === "header") {
+          request.headers[authDef.schema.name] = authDef.value;
+          return;
+        } else if (authDef.schema.type === "oauth2" && authDef.token.token_type === "Bearer") {
+          request.headers["Authorization"] = `Bearer ${authDef.token.access_token}`;
+          return;
+        }
+      }
+    };
+
+    const requestInterceptor = (request, ...args) => {
+      if (request.loadSpec && schemaAuthNames.length > 0 && !schemaAuthFailed) {
+        try {
+          injectAuthCredentials(request);
+        } catch (e) {
+          console.error("schema auth injection failed with error: ", e);
+        }
+      }
+      if (!["GET", undefined].includes(request.method) && request.credentials === "same-origin") {
+        request.headers["{{ csrf_header_name }}"] = "{{ csrf_token }}";
+      }
+      return request;
+    };
+
+    const ui = SwaggerUIBundle({
+      url: "{{ schema_url }}",
+      dom_id: "#swagger-ui",
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+      plugins,
+      layout: "BaseLayout",
+      requestInterceptor,
+      responseInterceptor,
+      ...swaggerSettings,
+    });
+
+    ui.initOAuth({{ oauth2_config|safe }});
+  </script>
+</body>
+</html>
