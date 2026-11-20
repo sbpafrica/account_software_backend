@@ -369,3 +369,142 @@ class TestOrganizationEndpoints:
         assert res.status_code == status.HTTP_403_FORBIDDEN
 
 
+@pytest.mark.django_db
+class TestMultiTenantAdminIsolation:
+    def test_organization_admin_sees_only_own_organization(self, rf):
+        from django.contrib.admin.sites import AdminSite
+        from apps.organizations.models import (
+            Organization, SubscriptionPlan, SubscriptionPlanTier, OrganizationRole,
+            OrganizationMembership, OrganizationInvitation, PaymentWebhookLog
+        )
+        from apps.organizations.admin import (
+            OrganizationAdmin, OrganizationMembershipAdmin,
+            SubscriptionTransactionAdmin, PaymentWebhookLogAdmin
+        )
+        from apps.users.admin import UserAdmin
+
+        # Setup 2 separate organizations
+        org_a = Organization.objects.create(name="Alpha Corp", slug="alpha-corp", plan=SubscriptionPlanTier.STARTER)
+        admin_a = User.objects.create_user(
+            email="admin@alpha.com",
+            password="Password123!",
+            first_name="Alpha",
+            last_name="Admin",
+            is_staff=True
+        )
+        OrganizationMembership.objects.create(organization=org_a, user=admin_a, role=OrganizationRole.ADMIN)
+
+        org_b = Organization.objects.create(name="Beta Industries", slug="beta-ind", plan=SubscriptionPlanTier.GROWTH)
+        admin_b = User.objects.create_user(
+            email="admin@beta.com",
+            password="Password123!",
+            first_name="Beta",
+            last_name="Admin",
+            is_staff=True
+        )
+        OrganizationMembership.objects.create(organization=org_b, user=admin_b, role=OrganizationRole.ADMIN)
+
+        superadmin = User.objects.create_superuser(
+            email="super@sbpafrica.group",
+            password="SuperPassword123!",
+            first_name="Super",
+            last_name="Admin"
+        )
+
+        site = AdminSite()
+        org_admin = OrganizationAdmin(Organization, site)
+        membership_admin = OrganizationMembershipAdmin(OrganizationMembership, site)
+        user_admin = UserAdmin(User, site)
+        webhook_admin = PaymentWebhookLogAdmin(PaymentWebhookLog, site)
+
+        # 1. OrganizationAdmin isolation
+        req_a = rf.get("/admin/organizations/organization/")
+        req_a.user = admin_a
+        qs_a = org_admin.get_queryset(req_a)
+        assert list(qs_a) == [org_a]
+        assert org_b not in qs_a
+
+        req_b = rf.get("/admin/organizations/organization/")
+        req_b.user = admin_b
+        qs_b = org_admin.get_queryset(req_b)
+        assert list(qs_b) == [org_b]
+        assert org_a not in qs_b
+
+        req_super = rf.get("/admin/organizations/organization/")
+        req_super.user = superadmin
+        qs_super = org_admin.get_queryset(req_super)
+        assert org_a in qs_super
+        assert org_b in qs_super
+
+        # 2. Permissions: Non-superusers cannot add or delete organizations
+        assert org_admin.has_add_permission(req_a) is False
+        assert org_admin.has_delete_permission(req_a, obj=org_a) is False
+        assert org_admin.has_add_permission(req_super) is True
+        assert org_admin.has_delete_permission(req_super, obj=org_a) is True
+
+        # 3. MembershipAdmin isolation
+        m_qs_a = membership_admin.get_queryset(req_a)
+        assert all(m.organization == org_a for m in m_qs_a)
+        assert not any(m.organization == org_b for m in m_qs_a)
+
+        # 4. UserAdmin isolation
+        u_qs_a = user_admin.get_queryset(req_a)
+        assert admin_a in u_qs_a
+        assert admin_b not in u_qs_a
+
+        # 5. Webhook logs hidden from non-superusers
+        assert webhook_admin.has_module_permission(req_a) is False
+        assert webhook_admin.has_module_permission(req_super) is True
+
+    def test_api_tenant_isolation_and_header_anti_spoofing(self, api_client):
+        """
+        Verify that in the REST API backend:
+        1. An admin of Organization A cannot access Organization B's detail endpoint (HTTP 403 Forbidden).
+        2. If Admin A sends 'X-Organization-ID: <org_B_id>', TenantMiddleware rejects the spoofing
+           and keeps the context bound strictly to Organization A.
+        """
+        org_a = Organization.objects.create(name="Alpha Corp", slug="alpha-corp", plan=SubscriptionPlanTier.GROWTH)
+        admin_a = User.objects.create_user(
+            email="admin_a@alpha.com",
+            password="Password123!",
+            first_name="Alpha",
+            last_name="Admin"
+        )
+        OrganizationMembership.objects.create(organization=org_a, user=admin_a, role=OrganizationRole.ADMIN, is_default=True)
+
+        org_b = Organization.objects.create(name="Beta Industries", slug="beta-ind", plan=SubscriptionPlanTier.GROWTH)
+        admin_b = User.objects.create_user(
+            email="admin_b@beta.com",
+            password="Password123!",
+            first_name="Beta",
+            last_name="Admin"
+        )
+        OrganizationMembership.objects.create(organization=org_b, user=admin_b, role=OrganizationRole.ADMIN, is_default=True)
+
+        # Authenticate as Admin A
+        tokens_a = JWTTokenService.get_tokens_for_user(admin_a, org_a)
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens_a['access']}")
+
+        # 1. Admin A can access Org A detail endpoint
+        res_a = api_client.get(f"/api/v1/organizations/{org_a.id}/")
+        assert res_a.status_code == status.HTTP_200_OK
+        assert res_a.json()['data']['name'] == "Alpha Corp"
+
+        # 2. Admin A CANNOT access Org B detail endpoint (HTTP 403 Forbidden)
+        res_b = api_client.get(f"/api/v1/organizations/{org_b.id}/")
+        assert res_b.status_code == status.HTTP_403_FORBIDDEN
+
+        # 3. Admin A CANNOT access superadmin list of all organizations
+        res_admin_list = api_client.get("/api/v1/organizations/admin/list/")
+        assert res_admin_list.status_code == status.HTTP_403_FORBIDDEN
+
+        # 4. Anti-spoofing: Admin A tries to pass Org B in 'X-Organization-ID' header
+        # TenantMiddleware must reject Org B and keep the context as Org A
+        res_spoof = api_client.get("/api/v1/organizations/billing/transactions/", HTTP_X_ORGANIZATION_ID=str(org_b.id))
+        assert res_spoof.status_code == status.HTTP_200_OK
+        # The returned response header must be Org A, NOT the spoofed Org B
+        assert res_spoof.headers.get("X-Organization-ID") == str(org_a.id)
+
+
+
+

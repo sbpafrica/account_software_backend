@@ -9,6 +9,14 @@ class AuditLogAdmin(admin.ModelAdmin):
     search_fields = ('resource_type', 'resource_id', 'ip_address')
     readonly_fields = ('id', 'actor_user', 'action', 'module', 'resource_type', 'resource_id', 'ip_address', 'user_agent', 'changes', 'timestamp')
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser:
+            return qs.filter(
+                actor_user__organization_memberships__organization__memberships__user=request.user
+            ).distinct()
+        return qs
+
     def has_add_permission(self, request):
         return False
 
@@ -22,6 +30,14 @@ class DocumentAttachmentAdmin(admin.ModelAdmin):
     list_filter = ('module',)
     search_fields = ('file_name', 'resource_id')
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser:
+            return qs.filter(
+                uploaded_by__organization_memberships__organization__memberships__user=request.user
+            ).distinct()
+        return qs
+
 
 @admin.register(IdempotencyRecord)
 class IdempotencyRecordAdmin(admin.ModelAdmin):
@@ -29,3 +45,15 @@ class IdempotencyRecordAdmin(admin.ModelAdmin):
     list_filter = ('is_processing', 'request_method')
     search_fields = ('key', 'request_path')
     readonly_fields = ('key', 'user', 'organization', 'request_path', 'request_method', 'request_digest', 'response_status_code', 'response_headers', 'response_body', 'is_processing', 'expires_at', 'created_at')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser:
+            return qs.filter(organization__memberships__user=request.user).distinct()
+        return qs
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

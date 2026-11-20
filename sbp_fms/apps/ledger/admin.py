@@ -14,6 +14,21 @@ class CompanyProfileAdmin(admin.ModelAdmin):
     search_fields = ('company_name', 'tax_identification_number')
     list_filter = ('country_code', 'base_currency')
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser:
+            return qs.filter(organization__memberships__user=request.user).distinct()
+        return qs
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if not request.user.is_superuser and db_field.name == "organization":
+            from apps.organizations.models import Organization
+            kwargs["queryset"] = Organization.objects.filter(
+                memberships__user=request.user,
+                memberships__role__in=['OWNER', 'ADMIN']
+            ).distinct()
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
 
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
