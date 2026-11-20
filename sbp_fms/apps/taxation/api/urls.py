@@ -3,7 +3,8 @@ from apps.taxation.api.public import TaxCalculatorPublicApi
 from apps.taxation.api.admin import (
     TaxRuleListAdminApi, TaxRuleDetailAdminApi,
     VATReturnSummaryAdminApi, IndirectTaxCalculatorAdminApi,
-    SSNITReturnSummaryAdminApi, SSNITScheduleGenerateAdminApi, SSNITReportExportAdminApi
+    SSNITReturnSummaryAdminApi, SSNITScheduleGenerateAdminApi, SSNITReportExportAdminApi,
+    SSNITMultiClientReportExportAdminApi, SSNITPaymentVoucherCreateAdminApi
 )
 
 urlpatterns = [
@@ -17,5 +18,7 @@ urlpatterns = [
     path('admin/returns/ssnit-summary/', SSNITReturnSummaryAdminApi.as_view(), name='ssnit-return-summary-admin'),
     path('admin/returns/ssnit-schedule/', SSNITScheduleGenerateAdminApi.as_view(), name='ssnit-schedule-generate-admin'),
     path('admin/returns/ssnit-export/', SSNITReportExportAdminApi.as_view(), name='ssnit-report-export-admin'),
+    path('admin/returns/ssnit-multi-client-export/', SSNITMultiClientReportExportAdminApi.as_view(), name='ssnit-multi-client-export-admin'),
+    path('admin/returns/ssnit-voucher/', SSNITPaymentVoucherCreateAdminApi.as_view(), name='ssnit-voucher-create-admin'),
     path('admin/calculate/indirect-tax/', IndirectTaxCalculatorAdminApi.as_view(), name='indirect-tax-calculate-admin'),
 ]

@@ -261,6 +261,118 @@ class TestTaxationCRUD:
         assert "Ama Serwaa" in csv_text
         assert "TOTALS" in csv_text
 
+        # 5. Multi-Client HR Firm SSNIT Portfolio Workflow
+        from apps.receivables.models import Client
+        from apps.payroll_escrow.models import PayrollBatch, PayrollBatchStatus
+        import uuid
+
+        client_a = Client.objects.create(
+            name="Ashanti Gold Mining Consortium",
+            code="AGMC",
+            tax_id="SSNIT-EMPR-910291",
+            category="CORPORATE"
+        )
+        client_b = Client.objects.create(
+            name="Horizon Logistics Ltd",
+            code="HLL",
+            tax_id="SSNIT-EMPR-384910",
+            category="CORPORATE"
+        )
+
+        # Batch for Client A: 100,000 gross (80,000 net + 20,000 statutory)
+        PayrollBatch.objects.create(
+            batch_code=f"PAY-GH-AGMC-{uuid.uuid4().hex[:4]}",
+            client_id=client_a.id,
+            client_name=client_a.name,
+            month=10,
+            year=2026,
+            total_net_salaries=Decimal("80000.00"),
+            total_statutory_taxes=Decimal("20000.00"),
+            total_management_fee=Decimal("5000.00"),
+            status=PayrollBatchStatus.FUNDED
+        )
+        # Batch for Client B: 50,000 gross (40,000 net + 10,000 statutory)
+        PayrollBatch.objects.create(
+            batch_code=f"PAY-GH-HLL-{uuid.uuid4().hex[:4]}",
+            client_id=client_b.id,
+            client_name=client_b.name,
+            month=10,
+            year=2026,
+            total_net_salaries=Decimal("40000.00"),
+            total_statutory_taxes=Decimal("10000.00"),
+            total_management_fee=Decimal("3000.00"),
+            status=PayrollBatchStatus.DRAFT
+        )
+
+        # 5a. Retrieve Consolidated Multi-Client SSNIT Portfolio
+        res_multi = api_client.get(summary_url, {"month": 10, "year": 2026})
+        assert res_multi.status_code == status.HTTP_200_OK
+        multi_data = res_multi.data["data"]
+        assert multi_data["total_clients"] >= 2
+        assert len(multi_data["clients"]) >= 2
+        assert "SBP Africa Group (Consolidated Multi-Client Return)" in multi_data["employer_name"]
+        # Total gross = 150,000 -> Tier 1 (13.5%) = 20,250.00; Tier 2 (5.0%) = 7,500.00
+        assert Decimal(str(multi_data["total_gross_salaries"])) >= Decimal("150000.00")
+        assert Decimal(str(multi_data["tier_1_payable_ssnit"])) >= Decimal("20250.00")
+        assert Decimal(str(multi_data["tier_2_payable_trustee"])) >= Decimal("7500.00")
+
+        # 5b. Retrieve Single-Client Filtered Summary
+        res_single = api_client.get(summary_url, {"month": 10, "year": 2026, "client_id": str(client_a.id)})
+        assert res_single.status_code == status.HTTP_200_OK
+        single_data = res_single.data["data"]
+        assert single_data["client_id"] == str(client_a.id)
+        assert single_data["employer_name"] == "Ashanti Gold Mining Consortium"
+        assert single_data["employer_ssnit_number"] == "SSNIT-EMPR-910291"
+        assert single_data["total_clients"] == 1
+        assert Decimal(str(single_data["total_gross_salaries"])) == Decimal("100000.00")
+        assert Decimal(str(single_data["tier_1_payable_ssnit"])) == Decimal("13500.00")
+        assert Decimal(str(single_data["tier_2_payable_trustee"])) == Decimal("5000.00")
+        assert single_data["clients"][0]["is_funded"] is True
+
+        # 5c. Export Consolidated Multi-Client CSV Report
+        multi_export_url = reverse("ssnit-multi-client-export-admin")
+        res_multi_csv = api_client.get(multi_export_url, {"month": 10, "year": 2026})
+        assert res_multi_csv.status_code == status.HTTP_200_OK
+        assert "text/csv" in res_multi_csv["Content-Type"]
+        multi_csv_text = res_multi_csv.content.decode("utf-8")
+        assert "CONSOLIDATED MULTI-CLIENT SSNIT RETURN" in multi_csv_text
+        assert "Ashanti Gold Mining Consortium" in multi_csv_text
+        assert "Horizon Logistics Ltd" in multi_csv_text
+        assert "CONSOLIDATED TOTALS" in multi_csv_text
+
+        # 5d. Create Statutory Payment Voucher for SSNIT Tier 1 (13.5%)
+        voucher_create_url = reverse("ssnit-voucher-create-admin")
+        v_payload = {
+            "month": 10,
+            "year": 2026,
+            "client_id": str(client_a.id),
+            "remittance_type": "TIER_1_SSNIT",
+            "notes": "Remitted via GCB SSNIT Corporate Portal"
+        }
+        res_v = api_client.post(voucher_create_url, v_payload, format="json")
+        assert res_v.status_code == status.HTTP_201_CREATED
+        v_data = res_v.data["data"]
+        assert v_data["payee_name"] == "Social Security and National Insurance Trust (SSNIT)"
+        assert v_data["payee_type"] == "GOVERNMENT"
+        assert Decimal(str(v_data["net_amount"])) == Decimal("13500.00")
+        assert "PV-SSNIT-202610-" in v_data["voucher_number"]
+
+        # 5e. Create Statutory Payment Voucher for Corporate Pension Trustee Tier 2 (5.0%)
+        v_payload_t2 = {
+            "month": 10,
+            "year": 2026,
+            "client_id": str(client_a.id),
+            "remittance_type": "TIER_2_TRUSTEE",
+            "trustee_name": "Enterprise Trustees Ltd",
+            "notes": "Occupational Pension Tier 2 Master Trust"
+        }
+        res_v_t2 = api_client.post(voucher_create_url, v_payload_t2, format="json")
+        assert res_v_t2.status_code == status.HTTP_201_CREATED
+        v_data_t2 = res_v_t2.data["data"]
+        assert "Enterprise Trustees Ltd" in v_data_t2["payee_name"]
+        assert v_data_t2["payee_type"] == "GOVERNMENT"
+        assert Decimal(str(v_data_t2["net_amount"])) == Decimal("5000.00")
+
 
 
 

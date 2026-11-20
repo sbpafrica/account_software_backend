@@ -88,3 +88,90 @@ class TaxationService:
         rule = TaxRule.objects.get(id=rule_id)
         rule.delete()
         CacheManager.invalidate_taxation()
+
+    @staticmethod
+    @transaction.atomic
+    def create_ssnit_statutory_payment_voucher(*, month: int, year: int,
+                                               remittance_type: str = 'TIER_1_SSNIT',
+                                               client_id = None, bank_account_id = None,
+                                               trustee_name: str = '', user = None,
+                                               notes: str = '') -> 'PaymentVoucher':
+        """
+        Creates an Accounts Payable statutory disbursement voucher (PaymentVoucher)
+        for SSNIT Tier 1 (13.5%), Tier 2 (5.0%), or Combined pension contributions.
+        Follows Ghana Act 766 compliance and SBP Africa's multi-client HR disbursement workflow.
+        """
+        import uuid
+        from django.utils import timezone
+        from apps.payables.models import PaymentVoucher, PayeeType, PaymentMethod, VoucherLine
+        from apps.payables.services import PayablesService
+        from apps.ledger.models import Account, AccountType
+        from apps.taxation.selectors import ssnit_return_summary_get
+
+        summary = ssnit_return_summary_get(month=month, year=year, client_id=client_id)
+
+        # Determine statutory liability amount and payee
+        if remittance_type == 'TIER_1_SSNIT':
+            payee_name = "Social Security and National Insurance Trust (SSNIT)"
+            amount = summary['tier_1_payable_ssnit']
+            type_label = "Tier 1 (13.5% SSNIT)"
+        elif remittance_type == 'TIER_2_TRUSTEE':
+            p_trustee = trustee_name.strip() if trustee_name else "Mandatory Occupational Pension Trustee"
+            payee_name = f"Corporate Pension Trustee - {p_trustee}"
+            amount = summary['tier_2_payable_trustee']
+            type_label = f"Tier 2 (5.0% {p_trustee})"
+        elif remittance_type == 'COMBINED':
+            payee_name = "SSNIT & Registered Corporate Pension Trustees"
+            amount = summary['total_statutory_pension_liability']
+            type_label = "Tier 1 & Tier 2 Combined (18.5%)"
+        else:
+            raise ValidationError(f"Invalid statutory remittance type: '{remittance_type}'.")
+
+        if amount <= Decimal('0.00'):
+            raise ValidationError(f"Cannot generate statutory voucher for zero or negative amount ({amount} GHS).")
+
+        uid_suffix = uuid.uuid4().hex[:6].upper()
+        voucher_num = f"PV-SSNIT-{year}{month:02d}-{uid_suffix}"
+        period_lbl = summary.get('period_label', f"{month}/{year}")
+        employer = summary.get('employer_name', 'Client Employer')
+
+        desc = f"Statutory {type_label} pension remittance for {employer} - Period: {period_lbl}"
+        if notes:
+            desc = f"{desc} | {notes}"
+
+        # Get or create GL Account for statutory tax & pension payable
+        acct, _ = Account.objects.get_or_create(
+            code='2020-TAX-PAYABLE-GH',
+            defaults={
+                'name': 'Statutory Tax & Pension Payable (GRA/SSNIT)',
+                'account_type': AccountType.LIABILITY,
+                'currency': 'GHS',
+                'country_code': 'GH'
+            }
+        )
+
+        lines_data = [
+            {
+                'account_id': str(acct.id),
+                'description': f"Statutory {type_label} contribution remittance",
+                'amount': amount
+            }
+        ]
+
+        voucher = PayablesService.voucher_create_draft(
+            voucher_number=voucher_num,
+            voucher_date=timezone.now().date(),
+            payee_name=payee_name,
+            payee_type=PayeeType.GOVERNMENT,
+            payment_method=PaymentMethod.BANK_TRANSFER,
+            bank_account_id=bank_account_id,
+            gross_amount=amount,
+            wht_rate=Decimal('0.0000'),
+            other_deductions=Decimal('0.0000'),
+            description=desc,
+            client_id=client_id,
+            lines_data=lines_data,
+            user=user
+        )
+
+        return voucher

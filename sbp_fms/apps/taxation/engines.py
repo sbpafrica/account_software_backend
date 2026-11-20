@@ -257,6 +257,72 @@ class GhanaTaxEngine:
         return output.getvalue()
 
     @staticmethod
+    def export_ssnit_multi_client_csv(summary_data: dict) -> str:
+        """
+        Exports the Multi-Client Consolidated SSNIT Return as CSV string for SBP Africa.
+        Summarizes statutory Tier 1 (13.5%) & Tier 2 (5.0%) across all managed corporate clients.
+        """
+        import io
+        import csv
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        writer.writerow(["SBP AFRICA GROUP - CONSOLIDATED MULTI-CLIENT SSNIT RETURN (ACT 766)"])
+        writer.writerow(["Employer / HR Firm:", summary_data.get('employer_name', 'SBP Africa Group')])
+        writer.writerow(["Contribution Period:", summary_data.get('period_label', '')])
+        writer.writerow(["Submission Deadline:", summary_data.get('submission_deadline', '')])
+        writer.writerow(["Total Managed Clients:", summary_data.get('total_clients', 0)])
+        writer.writerow(["Statutory Notice:", "Remittance due on or before the 14th; 3% compounding monthly penalty applies."])
+        writer.writerow([])
+
+        writer.writerow([
+            "Client Code",
+            "Client / Employer Name",
+            "Employer SSNIT Number",
+            "Payroll Batches",
+            "Escrow Status",
+            "Total Gross Salaries (GHS)",
+            "Employee Share (5.5%)",
+            "Employer Share (13.0%)",
+            "Total Contribution (18.5%)",
+            "Tier 1 to SSNIT (13.5%)",
+            "Tier 2 to Trustee (5.0%)",
+        ])
+
+        for c in summary_data.get('clients', []):
+            writer.writerow([
+                c.get('client_code', ''),
+                c.get('client_name', ''),
+                c.get('employer_ssnit_number', ''),
+                c.get('batch_count', 0),
+                "FUNDED" if c.get('is_funded') else "PENDING / SHORTFALL",
+                f"{Decimal(str(c.get('gross_salaries', 0))):.2f}",
+                f"{Decimal(str(c.get('employee_share', 0))):.2f}",
+                f"{Decimal(str(c.get('employer_share', 0))):.2f}",
+                f"{Decimal(str(c.get('total_ssnit_liability', 0))):.2f}",
+                f"{Decimal(str(c.get('tier_1_ssnit', 0))):.2f}",
+                f"{Decimal(str(c.get('tier_2_trustee', 0))):.2f}",
+            ])
+
+        writer.writerow([])
+        writer.writerow([
+            "CONSOLIDATED TOTALS",
+            f"{summary_data.get('total_clients', 0)} Corporate Clients",
+            "",
+            "",
+            "",
+            f"{Decimal(str(summary_data.get('total_gross_salaries', 0))):.2f}",
+            f"{Decimal(str(summary_data.get('total_employee_share', 0))):.2f}",
+            f"{Decimal(str(summary_data.get('total_employer_share', 0))):.2f}",
+            f"{Decimal(str(summary_data.get('total_statutory_pension_liability', 0))):.2f}",
+            f"{Decimal(str(summary_data.get('tier_1_payable_ssnit', 0))):.2f}",
+            f"{Decimal(str(summary_data.get('tier_2_payable_trustee', 0))):.2f}",
+        ])
+
+        return output.getvalue()
+
+    @staticmethod
     def calculate_vendor_wht(service_amount: Decimal, category: str = 'SERVICES') -> dict:
         amount = Decimal(str(service_amount))
         rates = {

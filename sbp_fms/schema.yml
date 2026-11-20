@@ -7174,12 +7174,62 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /api/v1/taxation/admin/returns/ssnit-multi-client-export/:
+    get:
+      operationId: admin_taxation_ssnit_multi_client_export
+      description: Generates a consolidated CSV schedule of all managed corporate
+        clients, their employer SSNIT numbers, escrow statuses, Tier 1 (13.5%), Tier
+        2 (5.0%), and total statutory pension liabilities for SBP Africa.
+      summary: Export Consolidated Multi-Client SSNIT Contribution Schedule as CSV
+      parameters:
+      - in: query
+        name: month
+        schema:
+          type: integer
+        description: Contribution Month (1-12)
+      - in: query
+        name: year
+        schema:
+          type: integer
+        description: Contribution Year (e.g. 2026)
+      tags:
+      - Taxation - Returns
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: string
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/v1/taxation/admin/returns/ssnit-schedule/:
     post:
       operationId: admin_taxation_ssnit_schedule_generate
       description: Calculates the complete employee schedule table for SSNIT monthly
         reporting with Employee 5.5%, Employer 13.0%, Tier 1 (13.5%), Tier 2 (5.0%),
-        and statutory compliance deadlines.
+        and statutory compliance deadlines. Supports client auto-population and payroll
+        batch fallback.
       summary: Generate Itemized SSNIT Monthly Contribution Return Schedule
       tags:
       - Taxation - Returns
@@ -7236,9 +7286,16 @@ paths:
       operationId: admin_taxation_ssnit_return_summary
       description: 'Computes statutory SSNIT pension return summary: Employee Share
         (5.5%), Employer Share (13.0%), Tier 1 Remittance to SSNIT (13.5%), Tier 2
-        Remittance to Private Trustee (5.0%), and filing deadlines.'
+        Remittance to Private Trustee (5.0%), and filing deadlines. Supports filtering
+        by client_id or returning consolidated portfolio across all outsourced corporate
+        clients.'
       summary: Retrieve Ghana SSNIT Monthly Return Summary (Act 766)
       parameters:
+      - in: query
+        name: client_id
+        schema:
+          type: string
+        description: Optional Client UUID to filter by specific client entity
       - in: query
         name: month
         schema:
@@ -7274,6 +7331,57 @@ paths:
                 - message
           description: ''
         '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/taxation/admin/returns/ssnit-voucher/:
+    post:
+      operationId: admin_taxation_ssnit_voucher_create
+      description: Generates an Accounts Payable statutory disbursement voucher (PaymentVoucher)
+        for SSNIT Tier 1 (13.5%), Tier 2 (5.0%), or Combined pension contributions.
+        Automatically sets PayeeType to GOVERNMENT and links to statutory liabilities.
+      summary: Create Statutory SSNIT or Private Pension Trustee Payment Voucher
+      tags:
+      - Taxation - Returns
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SSNITPaymentVoucherCreateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SSNITPaymentVoucherCreateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SSNITPaymentVoucherCreateInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+        '400':
           content:
             application/json:
               schema:
@@ -17647,6 +17755,16 @@ components:
       description: |-
         * `DRAFT` - Draft
         * `COMPLETED` - Completed
+    RemittanceTypeEnum:
+      enum:
+      - TIER_1_SSNIT
+      - TIER_2_TRUSTEE
+      - COMBINED
+      type: string
+      description: |-
+        * `TIER_1_SSNIT` - TIER_1_SSNIT
+        * `TIER_2_TRUSTEE` - TIER_2_TRUSTEE
+        * `COMBINED` - COMBINED
     RoleAssignPermissionsInputRequest:
       type: object
       properties:
@@ -17727,6 +17845,61 @@ components:
           items:
             type: string
             minLength: 1
+    SSNITClientSummaryItem:
+      type: object
+      properties:
+        client_id:
+          type: string
+        client_name:
+          type: string
+        client_code:
+          type: string
+          default: ''
+        employer_ssnit_number:
+          type: string
+          default: ''
+        batch_count:
+          type: integer
+        batch_status:
+          type: string
+        is_funded:
+          type: boolean
+        gross_salaries:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        employee_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        employer_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        tier_1_ssnit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        tier_2_trustee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        total_ssnit_liability:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+      required:
+      - batch_count
+      - batch_status
+      - client_id
+      - client_name
+      - employee_share
+      - employer_share
+      - gross_salaries
+      - is_funded
+      - tier_1_ssnit
+      - tier_2_trustee
+      - total_ssnit_liability
     SSNITEmployeeItemInputRequest:
       type: object
       properties:
@@ -17795,9 +17968,50 @@ components:
       - tier_1_ssnit
       - tier_2_trustee
       - total_contribution
+    SSNITPaymentVoucherCreateInputRequest:
+      type: object
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          nullable: true
+        month:
+          type: integer
+          maximum: 12
+          minimum: 1
+        year:
+          type: integer
+          maximum: 2100
+          minimum: 2000
+        remittance_type:
+          allOf:
+          - $ref: '#/components/schemas/RemittanceTypeEnum'
+          default: TIER_1_SSNIT
+          description: |-
+            Specifies statutory destination: TIER_1_SSNIT (13.5% directly to SSNIT), TIER_2_TRUSTEE (5.0% to Corporate Trustee), or COMBINED (18.5%).
+
+            * `TIER_1_SSNIT` - TIER_1_SSNIT
+            * `TIER_2_TRUSTEE` - TIER_2_TRUSTEE
+            * `COMBINED` - COMBINED
+        trustee_name:
+          type: string
+          default: ''
+        bank_account_id:
+          type: string
+          format: uuid
+          nullable: true
+        notes:
+          type: string
+          default: ''
+      required:
+      - month
+      - year
     SSNITReturnSummaryOutput:
       type: object
       properties:
+        client_id:
+          type: string
+          nullable: true
         employer_name:
           type: string
         employer_ssnit_number:
@@ -17814,6 +18028,9 @@ components:
           type: integer
         is_overdue:
           type: boolean
+        total_clients:
+          type: integer
+          default: 1
         total_employees:
           type: integer
         total_gross_salaries:
@@ -17842,6 +18059,10 @@ components:
           pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
         statutory_penalty_clause:
           type: string
+        clients:
+          type: array
+          items:
+            $ref: '#/components/schemas/SSNITClientSummaryItem'
       required:
       - days_until_deadline
       - employer_name
@@ -17862,12 +18083,20 @@ components:
     SSNITScheduleGenerateInputRequest:
       type: object
       properties:
+        client_id:
+          type: string
+          format: uuid
+          nullable: true
         employer_name:
           type: string
           maxLength: 255
         employer_ssnit_number:
           type: string
           maxLength: 50
+        trustee_name:
+          type: string
+          default: ''
+          maxLength: 255
         month:
           type: integer
           maximum: 12
@@ -17880,9 +18109,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SSNITEmployeeItemInputRequest'
-          minItems: 1
       required:
-      - employees
       - month
       - year
     SSNITScheduleOutput:
@@ -17892,6 +18119,9 @@ components:
           type: string
         employer_ssnit_number:
           type: string
+        trustee_name:
+          type: string
+          default: ''
         period_month:
           type: integer
         period_year:

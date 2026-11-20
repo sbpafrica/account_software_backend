@@ -120,15 +120,19 @@ def vat_return_summary_get(*, start_date: Optional[date] = None,
     }
 
 
-def ssnit_return_summary_get(*, month: Optional[int] = None, year: Optional[int] = None, organization_id = None) -> dict:
+def ssnit_return_summary_get(*, month: Optional[int] = None, year: Optional[int] = None, organization_id = None, client_id = None) -> dict:
     """
-    Computes Ghana SSNIT Monthly Return Summary per Act 766.
+    Computes Ghana SSNIT Monthly Return Summary per Act 766 for SBP Africa.
+    Supports:
+    1. Single-client filtering when `client_id` is supplied.
+    2. Consolidated multi-client portfolio overview across all outsourced clients when `client_id` is omitted.
     Extracts workforce payroll batches and evaluates statutory Tier 1 (13.5%) & Tier 2 (5.0%) liabilities.
     """
     import datetime
     from apps.ledger.models import CompanyProfile
     from apps.payroll_escrow.models import PayrollBatch
     from apps.organizations.models import Organization
+    from apps.receivables.models import Client
     from apps.taxation.engines import GhanaTaxEngine
 
     now = timezone.now().date()
@@ -139,35 +143,6 @@ def ssnit_return_summary_get(*, month: Optional[int] = None, year: Optional[int]
         month = now.month - 1 if now.month > 1 else 12
         if now.month == 1:
             year -= 1
-
-    # 1. Employer details
-    employer_name = "SBP Africa Group"
-    employer_ssnit = "SSNIT-GH-001928"
-
-    org = None
-    if organization_id:
-        org = Organization.objects.filter(id=organization_id).first()
-
-    company = CompanyProfile.objects.first()
-    if company:
-        employer_name = company.company_name
-        employer_ssnit = company.tax_identification_number or company.registration_number or employer_ssnit
-    elif org:
-        employer_name = org.name
-
-    # 2. Query payroll batches for this month/year
-    batches = PayrollBatch.objects.filter(month=month, year=year)
-    if org:
-        batches = batches.filter(client_id=org.id)
-
-    total_gross = Decimal('0.00')
-    batch_count = batches.count()
-
-    if batch_count > 0:
-        for b in batches:
-            total_gross += (b.total_net_salaries + b.total_statutory_taxes)
-
-    ssnit_calc = GhanaTaxEngine.calculate_ssnit(total_gross)
 
     # Calculate statutory deadline: 14th of following month
     if month == 12:
@@ -183,22 +158,157 @@ def ssnit_return_summary_get(*, month: Optional[int] = None, year: Optional[int]
                    "July", "August", "September", "October", "November", "December"]
     period_label = f"{month_names[month - 1]} {year}" if 1 <= month <= 12 else f"{month}/{year}"
 
+    # Default firm info
+    firm_name = "SBP Africa Group"
+    firm_ssnit = "SSNIT-GH-001928"
+    company = CompanyProfile.objects.first()
+    if company:
+        firm_name = company.company_name
+        firm_ssnit = company.tax_identification_number or company.registration_number or firm_ssnit
+
+    batches_qs = PayrollBatch.objects.filter(month=month, year=year)
+
+    # 1. CLIENT-SPECIFIC SUMMARY
+    if client_id:
+        client_obj = Client.objects.filter(id=client_id).first()
+        client_batches = batches_qs.filter(client_id=client_id)
+
+        client_name = client_obj.name if client_obj else (client_batches.first().client_name if client_batches.exists() else "Client Organization")
+        client_ssnit = client_obj.tax_id if client_obj and client_obj.tax_id else f"SSNIT-CL-{str(client_id)[:8].upper()}"
+        client_code = client_obj.code if client_obj and client_obj.code else "CLI"
+
+        total_gross = Decimal('0.00')
+        all_funded = True
+        for b in client_batches:
+            total_gross += (b.total_net_salaries + b.total_statutory_taxes)
+            if b.status not in ['FUNDED', 'DISBURSED']:
+                all_funded = False
+
+        ssnit_calc = GhanaTaxEngine.calculate_ssnit(total_gross)
+        batch_count = client_batches.count()
+
+        client_item = {
+            'client_id': str(client_id),
+            'client_name': client_name,
+            'client_code': client_code,
+            'employer_ssnit_number': client_ssnit,
+            'batch_count': batch_count,
+            'batch_status': client_batches.first().status if batch_count > 0 else 'NONE',
+            'is_funded': all_funded if batch_count > 0 else False,
+            'gross_salaries': total_gross.quantize(Decimal('0.01')),
+            'employee_share': ssnit_calc['employee_ssnit'],
+            'employer_share': ssnit_calc['employer_ssnit'],
+            'tier_1_ssnit': ssnit_calc['tier_1_ssnit'],
+            'tier_2_trustee': ssnit_calc['tier_2_trustee'],
+            'total_ssnit_liability': ssnit_calc['total_ssnit_liability'],
+        }
+
+        return {
+            'client_id': str(client_id),
+            'employer_name': client_name,
+            'employer_ssnit_number': client_ssnit,
+            'period_month': month,
+            'period_year': year,
+            'period_label': period_label,
+            'submission_deadline': deadline_date.isoformat(),
+            'days_until_deadline': days_left,
+            'is_overdue': days_left < 0,
+            'total_clients': 1,
+            'total_employees': batch_count if batch_count > 0 else 0,
+            'total_gross_salaries': total_gross.quantize(Decimal('0.01')),
+            'total_employee_share': ssnit_calc['employee_ssnit'],
+            'total_employer_share': ssnit_calc['employer_ssnit'],
+            'tier_1_payable_ssnit': ssnit_calc['tier_1_ssnit'],
+            'tier_2_payable_trustee': ssnit_calc['tier_2_trustee'],
+            'total_statutory_pension_liability': ssnit_calc['total_ssnit_liability'],
+            'statutory_penalty_clause': "Under Act 766 Section 64, remittances after the 14th attract a 3% compounding monthly penalty.",
+            'clients': [client_item]
+        }
+
+    # 2. CONSOLIDATED MULTI-CLIENT SUMMARY (SBP AFRICA HR FIRM PORTFOLIO)
+    if organization_id:
+        org = Organization.objects.filter(id=organization_id).first()
+        if org and batches_qs.filter(client_id=org.id).exists():
+            batches_qs = batches_qs.filter(client_id=org.id)
+
+    client_groups = {}
+    for b in batches_qs:
+        cid = str(b.client_id)
+        if cid not in client_groups:
+            client_groups[cid] = {
+                'client_name': b.client_name,
+                'batches': [],
+                'total_gross': Decimal('0.00'),
+                'all_funded': True,
+            }
+        client_groups[cid]['batches'].append(b)
+        client_groups[cid]['total_gross'] += (b.total_net_salaries + b.total_statutory_taxes)
+        if b.status not in ['FUNDED', 'DISBURSED']:
+            client_groups[cid]['all_funded'] = False
+
+    clients_summary = []
+    grand_total_gross = Decimal('0.00')
+    grand_total_emp = Decimal('0.00')
+    grand_total_empr = Decimal('0.00')
+    grand_total_tier1 = Decimal('0.00')
+    grand_total_tier2 = Decimal('0.00')
+    grand_total_liability = Decimal('0.00')
+
+    for cid, cdata in client_groups.items():
+        client_rec = Client.objects.filter(id=cid).first()
+        c_code = client_rec.code if client_rec and client_rec.code else "CLI"
+        c_ssnit = client_rec.tax_id if client_rec and client_rec.tax_id else f"SSNIT-CL-{cid[:8].upper()}"
+        c_name = client_rec.name if client_rec else cdata['client_name']
+
+        c_calc = GhanaTaxEngine.calculate_ssnit(cdata['total_gross'])
+        batch_cnt = len(cdata['batches'])
+        first_b = cdata['batches'][0] if cdata['batches'] else None
+
+        c_item = {
+            'client_id': cid,
+            'client_name': c_name,
+            'client_code': c_code,
+            'employer_ssnit_number': c_ssnit,
+            'batch_count': batch_cnt,
+            'batch_status': first_b.status if first_b else 'NONE',
+            'is_funded': cdata['all_funded'],
+            'gross_salaries': cdata['total_gross'].quantize(Decimal('0.01')),
+            'employee_share': c_calc['employee_ssnit'],
+            'employer_share': c_calc['employer_ssnit'],
+            'tier_1_ssnit': c_calc['tier_1_ssnit'],
+            'tier_2_trustee': c_calc['tier_2_trustee'],
+            'total_ssnit_liability': c_calc['total_ssnit_liability'],
+        }
+        clients_summary.append(c_item)
+
+        grand_total_gross += c_item['gross_salaries']
+        grand_total_emp += c_item['employee_share']
+        grand_total_empr += c_item['employer_share']
+        grand_total_tier1 += c_item['tier_1_ssnit']
+        grand_total_tier2 += c_item['tier_2_trustee']
+        grand_total_liability += c_item['total_ssnit_liability']
+
+    total_client_count = len(clients_summary)
+
     return {
-        'employer_name': employer_name,
-        'employer_ssnit_number': employer_ssnit,
+        'client_id': None,
+        'employer_name': f"{firm_name} (Consolidated Multi-Client Return)",
+        'employer_ssnit_number': firm_ssnit,
         'period_month': month,
         'period_year': year,
         'period_label': period_label,
         'submission_deadline': deadline_date.isoformat(),
         'days_until_deadline': days_left,
         'is_overdue': days_left < 0,
-        'total_employees': batch_count if batch_count > 0 else 0,
-        'total_gross_salaries': total_gross.quantize(Decimal('0.01')),
-        'total_employee_share': ssnit_calc['employee_ssnit'],
-        'total_employer_share': ssnit_calc['employer_ssnit'],
-        'tier_1_payable_ssnit': ssnit_calc['tier_1_ssnit'],
-        'tier_2_payable_trustee': ssnit_calc['tier_2_trustee'],
-        'total_statutory_pension_liability': ssnit_calc['total_ssnit_liability'],
-        'statutory_penalty_clause': "Under Act 766 Section 64, remittances after the 14th attract a 3% compounding monthly penalty."
+        'total_clients': total_client_count,
+        'total_employees': batches_qs.count(),
+        'total_gross_salaries': grand_total_gross.quantize(Decimal('0.01')),
+        'total_employee_share': grand_total_emp.quantize(Decimal('0.01')),
+        'total_employer_share': grand_total_empr.quantize(Decimal('0.01')),
+        'tier_1_payable_ssnit': grand_total_tier1.quantize(Decimal('0.01')),
+        'tier_2_payable_trustee': grand_total_tier2.quantize(Decimal('0.01')),
+        'total_statutory_pension_liability': grand_total_liability.quantize(Decimal('0.01')),
+        'statutory_penalty_clause': "Under Act 766 Section 64, remittances after the 14th attract a 3% compounding monthly penalty.",
+        'clients': clients_summary
     }
 

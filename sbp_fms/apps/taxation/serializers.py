@@ -113,13 +113,16 @@ class SSNITEmployeeItemInputSerializer(serializers.Serializer):
 
 
 class SSNITScheduleGenerateInputSerializer(serializers.Serializer):
+    client_id = serializers.UUIDField(required=False, allow_null=True)
     employer_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     employer_ssnit_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    trustee_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
     month = serializers.IntegerField(min_value=1, max_value=12)
     year = serializers.IntegerField(min_value=2000, max_value=2100)
     employees = serializers.ListField(
         child=SSNITEmployeeItemInputSerializer(),
-        min_length=1
+        required=False,
+        default=list
     )
 
 
@@ -139,6 +142,7 @@ class SSNITEmployeeScheduleItemOutputSerializer(serializers.Serializer):
 class SSNITScheduleOutputSerializer(serializers.Serializer):
     employer_name = serializers.CharField()
     employer_ssnit_number = serializers.CharField()
+    trustee_name = serializers.CharField(required=False, default='')
     period_month = serializers.IntegerField()
     period_year = serializers.IntegerField()
     period_label = serializers.CharField()
@@ -156,7 +160,24 @@ class SSNITScheduleOutputSerializer(serializers.Serializer):
     schedule = serializers.ListField(child=SSNITEmployeeScheduleItemOutputSerializer())
 
 
+class SSNITClientSummaryItemSerializer(serializers.Serializer):
+    client_id = serializers.CharField()
+    client_name = serializers.CharField()
+    client_code = serializers.CharField(required=False, allow_blank=True, default='')
+    employer_ssnit_number = serializers.CharField(required=False, allow_blank=True, default='')
+    batch_count = serializers.IntegerField()
+    batch_status = serializers.CharField()
+    is_funded = serializers.BooleanField()
+    gross_salaries = serializers.DecimalField(max_digits=18, decimal_places=2)
+    employee_share = serializers.DecimalField(max_digits=18, decimal_places=2)
+    employer_share = serializers.DecimalField(max_digits=18, decimal_places=2)
+    tier_1_ssnit = serializers.DecimalField(max_digits=18, decimal_places=2)
+    tier_2_trustee = serializers.DecimalField(max_digits=18, decimal_places=2)
+    total_ssnit_liability = serializers.DecimalField(max_digits=18, decimal_places=2)
+
+
 class SSNITReturnSummaryOutputSerializer(serializers.Serializer):
+    client_id = serializers.CharField(required=False, allow_null=True)
     employer_name = serializers.CharField()
     employer_ssnit_number = serializers.CharField()
     period_month = serializers.IntegerField()
@@ -165,6 +186,7 @@ class SSNITReturnSummaryOutputSerializer(serializers.Serializer):
     submission_deadline = serializers.CharField()
     days_until_deadline = serializers.IntegerField()
     is_overdue = serializers.BooleanField()
+    total_clients = serializers.IntegerField(default=1)
     total_employees = serializers.IntegerField()
     total_gross_salaries = serializers.DecimalField(max_digits=18, decimal_places=2)
     total_employee_share = serializers.DecimalField(max_digits=18, decimal_places=2)
@@ -173,4 +195,19 @@ class SSNITReturnSummaryOutputSerializer(serializers.Serializer):
     tier_2_payable_trustee = serializers.DecimalField(max_digits=18, decimal_places=2)
     total_statutory_pension_liability = serializers.DecimalField(max_digits=18, decimal_places=2)
     statutory_penalty_clause = serializers.CharField()
+    clients = serializers.ListField(child=SSNITClientSummaryItemSerializer(), required=False, default=list)
+
+
+class SSNITPaymentVoucherCreateInputSerializer(serializers.Serializer):
+    client_id = serializers.UUIDField(required=False, allow_null=True)
+    month = serializers.IntegerField(min_value=1, max_value=12)
+    year = serializers.IntegerField(min_value=2000, max_value=2100)
+    remittance_type = serializers.ChoiceField(
+        choices=['TIER_1_SSNIT', 'TIER_2_TRUSTEE', 'COMBINED'],
+        default='TIER_1_SSNIT',
+        help_text="Specifies statutory destination: TIER_1_SSNIT (13.5% directly to SSNIT), TIER_2_TRUSTEE (5.0% to Corporate Trustee), or COMBINED (18.5%)."
+    )
+    trustee_name = serializers.CharField(required=False, allow_blank=True, default='')
+    bank_account_id = serializers.UUIDField(required=False, allow_null=True)
+    notes = serializers.CharField(required=False, allow_blank=True, default='')
 
