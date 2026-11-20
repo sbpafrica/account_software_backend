@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError as DjangoValidationError
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
+from django.http import HttpResponse
 from apps.common.pagination import CustomPageNumberPagination, paginate_queryset
 from apps.common.responses import api_success
 from apps.users.permissions import HasPermissionCode, CountryScopedAccess
@@ -13,7 +14,9 @@ from apps.taxation.services import TaxationService
 from apps.taxation.serializers import (
     TaxRuleOutputSerializer, TaxRuleCreateInputSerializer, TaxRuleUpdateInputSerializer,
     IndirectTaxCalculatorInputSerializer, IndirectTaxCalculatorOutputSerializer,
-    VATReturnSummaryOutputSerializer
+    VATReturnSummaryOutputSerializer,
+    SSNITScheduleGenerateInputSerializer, SSNITScheduleOutputSerializer,
+    SSNITReturnSummaryOutputSerializer
 )
 
 
@@ -207,4 +210,118 @@ class IndirectTaxCalculatorAdminApi(APIView):
             include_covid_levy=include_covid
         )
         return api_success(data=result, message="Indirect tax calculated successfully.")
+
+
+class SSNITReturnSummaryAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('tax:read')()]
+
+    @extend_schema(
+        tags=['Taxation - Returns'],
+        operation_id='admin_taxation_ssnit_return_summary',
+        summary='Retrieve Ghana SSNIT Monthly Return Summary (Act 766)',
+        description='Computes statutory SSNIT pension return summary: Employee Share (5.5%), Employer Share (13.0%), Tier 1 Remittance to SSNIT (13.5%), Tier 2 Remittance to Private Trustee (5.0%), and filing deadlines.',
+        parameters=[
+            OpenApiParameter(name='month', description='Contribution Month (1-12)', required=False, type=int),
+            OpenApiParameter(name='year', description='Contribution Year (e.g. 2026)', required=False, type=int),
+        ],
+        responses={
+            status.HTTP_200_OK: SSNITReturnSummaryOutputSerializer,
+            status.HTTP_403_FORBIDDEN: dict
+        }
+    )
+    def get(self, request):
+        month = request.query_params.get('month')
+        year = request.query_params.get('year')
+        month_int = int(month) if month and month.isdigit() else None
+        year_int = int(year) if year and year.isdigit() else None
+
+        org = getattr(request, 'organization', None)
+        org_id = org.id if org else None
+
+        from apps.taxation.selectors import ssnit_return_summary_get
+        summary = ssnit_return_summary_get(month=month_int, year=year_int, organization_id=org_id)
+        return api_success(data=summary, message="SSNIT monthly return summary retrieved successfully.")
+
+
+class SSNITScheduleGenerateAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('tax:read')()]
+
+    @extend_schema(
+        tags=['Taxation - Returns'],
+        operation_id='admin_taxation_ssnit_schedule_generate',
+        summary='Generate Itemized SSNIT Monthly Contribution Return Schedule',
+        description='Calculates the complete employee schedule table for SSNIT monthly reporting with Employee 5.5%, Employer 13.0%, Tier 1 (13.5%), Tier 2 (5.0%), and statutory compliance deadlines.',
+        request=SSNITScheduleGenerateInputSerializer,
+        responses={
+            status.HTTP_200_OK: SSNITScheduleOutputSerializer,
+            status.HTTP_400_BAD_REQUEST: dict,
+            status.HTTP_403_FORBIDDEN: dict
+        }
+    )
+    def post(self, request):
+        serializer = SSNITScheduleGenerateInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        employer_name = serializer.validated_data.get('employer_name')
+        if not employer_name:
+            org = getattr(request, 'organization', None)
+            employer_name = org.name if org else "Employer Organization"
+
+        employer_ssnit = serializer.validated_data.get('employer_ssnit_number')
+        if not employer_ssnit:
+            employer_ssnit = "SSNIT-GH-EMPLOYER"
+
+        from apps.taxation.engines import GhanaTaxEngine
+        schedule = GhanaTaxEngine.generate_ssnit_monthly_schedule(
+            employer_name=employer_name,
+            employer_ssnit_id=employer_ssnit,
+            month=serializer.validated_data['month'],
+            year=serializer.validated_data['year'],
+            employees=serializer.validated_data['employees']
+        )
+        return api_success(data=schedule, message="SSNIT monthly contribution schedule generated successfully.")
+
+
+class SSNITReportExportAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('tax:read')()]
+
+    @extend_schema(
+        tags=['Taxation - Returns'],
+        operation_id='admin_taxation_ssnit_report_export',
+        summary='Export SSNIT Monthly Contribution Return as Downloadable CSV',
+        description='Generates an official formatted CSV document ready for submission to the SSNIT Employer Portal or designated bank under National Pensions Act 766.',
+        request=SSNITScheduleGenerateInputSerializer,
+        responses={
+            status.HTTP_200_OK: str,
+            status.HTTP_400_BAD_REQUEST: dict
+        }
+    )
+    def post(self, request):
+        serializer = SSNITScheduleGenerateInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        employer_name = serializer.validated_data.get('employer_name')
+        if not employer_name:
+            org = getattr(request, 'organization', None)
+            employer_name = org.name if org else "Employer Organization"
+
+        employer_ssnit = serializer.validated_data.get('employer_ssnit_number')
+        if not employer_ssnit:
+            employer_ssnit = "SSNIT-GH-EMPLOYER"
+
+        from apps.taxation.engines import GhanaTaxEngine
+        schedule_data = GhanaTaxEngine.generate_ssnit_monthly_schedule(
+            employer_name=employer_name,
+            employer_ssnit_id=employer_ssnit,
+            month=serializer.validated_data['month'],
+            year=serializer.validated_data['year'],
+            employees=serializer.validated_data['employees']
+        )
+
+        csv_content = GhanaTaxEngine.export_ssnit_schedule_csv(schedule_data)
+        filename = f"ssnit_monthly_return_{schedule_data['period_month']}_{schedule_data['period_year']}.csv"
+
+        response = HttpResponse(csv_content, content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 

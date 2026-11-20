@@ -6020,6 +6020,37 @@ paths:
                 - success
                 - message
           description: ''
+  /api/v1/paystack/webhook/:
+    post:
+      operationId: billing_paystack_webhook_2
+      description: Receives Paystack webhooks (e.g. charge.success, invoice.payment_failed).
+        Cryptographically verifies X-Paystack-Signature against PAYSTACK_SECRET_KEY,
+        records PaymentWebhookLog to prevent replay attacks, and activates customer
+        plans.
+      summary: Paystack payment webhook receiver
+      tags:
+      - Subscription Plans & Billing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaystackWebhookInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PaystackWebhookInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PaystackWebhookInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      - {}
+      responses:
+        '200':
+          description: Webhook processed or safely acknowledged
+        '400':
+          description: Invalid signature or malformed payload
   /api/v1/receivables/admin/aging-report/:
     get:
       operationId: admin_receivables_aging_report
@@ -6913,6 +6944,106 @@ paths:
                 - success
                 - message
           description: ''
+  /api/v1/receivables/invoices/{invoice_id}/paystack/initialize/:
+    post:
+      operationId: receivables_invoice_paystack_initialize
+      description: Initiates an online payment checkout with Paystack for a Client
+        Invoice. Returns the secure Paystack checkout authorization_url and reference.
+        Protected by financial idempotency headers.
+      summary: Initialize Paystack checkout for Client Invoice
+      parameters:
+      - in: path
+        name: invoice_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Accounts Receivable
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoicePaystackInitializeInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoicePaystackInitializeInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoicePaystackInitializeInputRequest'
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoicePaystackInitializeOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          description: Invoice not in payable state or invalid amount
+        '409':
+          description: Concurrent charge operation in progress
+  /api/v1/receivables/invoices/paystack/verify/:
+    post:
+      operationId: receivables_invoice_paystack_verify
+      description: Verifies transaction status with Paystack. Upon success, creates
+        a PaymentReceipt, allocates payment to the invoice, updates invoice status
+        to PAID/PARTIALLY_PAID, and creates balanced GL journal entries atomically.
+      summary: Verify Paystack payment for Client Invoice
+      tags:
+      - Accounts Receivable
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoicePaystackVerifyInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoicePaystackVerifyInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoicePaystackVerifyInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoicePaystackVerifyOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          description: Payment verification failed or invalid reference
+        '409':
+          description: Concurrent operation in progress
   /api/v1/receivables/public/clients/{client_id}/invoices/:
     get:
       operationId: public_receivables_client_invoices
@@ -6992,6 +7123,162 @@ paths:
                 required:
                 - success
                 - message
+          description: ''
+  /api/v1/taxation/admin/returns/ssnit-export/:
+    post:
+      operationId: admin_taxation_ssnit_report_export
+      description: Generates an official formatted CSV document ready for submission
+        to the SSNIT Employer Portal or designated bank under National Pensions Act
+        766.
+      summary: Export SSNIT Monthly Contribution Return as Downloadable CSV
+      tags:
+      - Taxation - Returns
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SSNITScheduleGenerateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SSNITScheduleGenerateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SSNITScheduleGenerateInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: string
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/taxation/admin/returns/ssnit-schedule/:
+    post:
+      operationId: admin_taxation_ssnit_schedule_generate
+      description: Calculates the complete employee schedule table for SSNIT monthly
+        reporting with Employee 5.5%, Employer 13.0%, Tier 1 (13.5%), Tier 2 (5.0%),
+        and statutory compliance deadlines.
+      summary: Generate Itemized SSNIT Monthly Contribution Return Schedule
+      tags:
+      - Taxation - Returns
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SSNITScheduleGenerateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SSNITScheduleGenerateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SSNITScheduleGenerateInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/SSNITScheduleOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/taxation/admin/returns/ssnit-summary/:
+    get:
+      operationId: admin_taxation_ssnit_return_summary
+      description: 'Computes statutory SSNIT pension return summary: Employee Share
+        (5.5%), Employer Share (13.0%), Tier 1 Remittance to SSNIT (13.5%), Tier 2
+        Remittance to Private Trustee (5.0%), and filing deadlines.'
+      summary: Retrieve Ghana SSNIT Monthly Return Summary (Act 766)
+      parameters:
+      - in: query
+        name: month
+        schema:
+          type: integer
+        description: Contribution Month (1-12)
+      - in: query
+        name: year
+        schema:
+          type: integer
+        description: Contribution Year (e.g. 2026)
+      tags:
+      - Taxation - Returns
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/SSNITReturnSummaryOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
           description: ''
   /api/v1/taxation/admin/returns/vat-summary/:
     get:
@@ -7376,7 +7663,6 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/TaxCalculationInputRequest'
-        required: true
       security:
       - jwtAuth: []
       - sbpTokenAuth: []
@@ -10415,7 +10701,7 @@ components:
       properties:
         code:
           type: string
-          minLength: 1
+          default: ''
           maxLength: 20
         name:
           type: string
@@ -10460,7 +10746,6 @@ components:
           default: ''
       required:
       - account_type
-      - code
       - name
     AccountOutput:
       type: object
@@ -10471,6 +10756,8 @@ components:
           readOnly: true
         code:
           type: string
+          description: Leave blank to automatically generate code based on Account
+            Type.
           maxLength: 20
         name:
           type: string
@@ -10513,7 +10800,6 @@ components:
           readOnly: true
       required:
       - account_type
-      - code
       - created_at
       - id
       - name
@@ -10533,7 +10819,7 @@ components:
         * `EQUITY` - Equity (3000-3999)
         * `REVENUE` - Revenue (4000-4999)
         * `DIRECT_COST` - Direct Cost (5000-5999)
-        * `OPEX` - Operating Expense (6000-6999)
+        * `OPEX` - Operating Expense (6000-7999)
     AccountUpdateInputRequest:
       type: object
       properties:
@@ -14321,6 +14607,79 @@ components:
       - invoice
       - item_code
       - updated_at
+    InvoicePaystackInitializeInputRequest:
+      type: object
+      properties:
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+          description: Amount to pay. Defaults to invoice balance due.
+        callback_url:
+          type: string
+          format: uri
+          nullable: true
+          minLength: 1
+          description: Frontend redirection URL after Paystack checkout completion.
+    InvoicePaystackInitializeOutput:
+      type: object
+      properties:
+        authorization_url:
+          type: string
+          format: uri
+          description: Paystack secure checkout URL to redirect the user to.
+        access_code:
+          type: string
+          description: Paystack checkout access code.
+        reference:
+          type: string
+          description: Unique transaction reference sent to Paystack.
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        currency:
+          type: string
+        invoice_number:
+          type: string
+      required:
+      - access_code
+      - amount
+      - authorization_url
+      - currency
+      - invoice_number
+      - reference
+    InvoicePaystackVerifyInputRequest:
+      type: object
+      properties:
+        reference:
+          type: string
+          minLength: 1
+          description: Paystack transaction reference received upon checkout completion.
+          maxLength: 100
+      required:
+      - reference
+    InvoicePaystackVerifyOutput:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        receipt:
+          allOf:
+          - $ref: '#/components/schemas/PaymentReceiptOutput'
+          nullable: true
+        invoice:
+          allOf:
+          - $ref: '#/components/schemas/ClientInvoiceOutput'
+          nullable: true
+      required:
+      - invoice
+      - message
+      - receipt
+      - status
     JournalEntryCreateInputRequest:
       type: object
       properties:
@@ -17368,6 +17727,233 @@ components:
           items:
             type: string
             minLength: 1
+    SSNITEmployeeItemInputRequest:
+      type: object
+      properties:
+        employee_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        ssnit_number:
+          type: string
+          default: ''
+          maxLength: 50
+        ghana_card_number:
+          type: string
+          default: ''
+          maxLength: 50
+        gross_salary:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+      required:
+      - employee_name
+      - gross_salary
+    SSNITEmployeeScheduleItemOutput:
+      type: object
+      properties:
+        serial_no:
+          type: integer
+        employee_name:
+          type: string
+        ssnit_number:
+          type: string
+        ghana_card_number:
+          type: string
+        gross_salary:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        employee_contribution:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        employer_contribution:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        total_contribution:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        tier_1_ssnit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        tier_2_trustee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+      required:
+      - employee_contribution
+      - employee_name
+      - employer_contribution
+      - ghana_card_number
+      - gross_salary
+      - serial_no
+      - ssnit_number
+      - tier_1_ssnit
+      - tier_2_trustee
+      - total_contribution
+    SSNITReturnSummaryOutput:
+      type: object
+      properties:
+        employer_name:
+          type: string
+        employer_ssnit_number:
+          type: string
+        period_month:
+          type: integer
+        period_year:
+          type: integer
+        period_label:
+          type: string
+        submission_deadline:
+          type: string
+        days_until_deadline:
+          type: integer
+        is_overdue:
+          type: boolean
+        total_employees:
+          type: integer
+        total_gross_salaries:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        total_employee_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        total_employer_share:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        tier_1_payable_ssnit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        tier_2_payable_trustee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        total_statutory_pension_liability:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        statutory_penalty_clause:
+          type: string
+      required:
+      - days_until_deadline
+      - employer_name
+      - employer_ssnit_number
+      - is_overdue
+      - period_label
+      - period_month
+      - period_year
+      - statutory_penalty_clause
+      - submission_deadline
+      - tier_1_payable_ssnit
+      - tier_2_payable_trustee
+      - total_employee_share
+      - total_employees
+      - total_employer_share
+      - total_gross_salaries
+      - total_statutory_pension_liability
+    SSNITScheduleGenerateInputRequest:
+      type: object
+      properties:
+        employer_name:
+          type: string
+          maxLength: 255
+        employer_ssnit_number:
+          type: string
+          maxLength: 50
+        month:
+          type: integer
+          maximum: 12
+          minimum: 1
+        year:
+          type: integer
+          maximum: 2100
+          minimum: 2000
+        employees:
+          type: array
+          items:
+            $ref: '#/components/schemas/SSNITEmployeeItemInputRequest'
+          minItems: 1
+      required:
+      - employees
+      - month
+      - year
+    SSNITScheduleOutput:
+      type: object
+      properties:
+        employer_name:
+          type: string
+        employer_ssnit_number:
+          type: string
+        period_month:
+          type: integer
+        period_year:
+          type: integer
+        period_label:
+          type: string
+        submission_deadline:
+          type: string
+        days_until_deadline:
+          type: integer
+        is_overdue:
+          type: boolean
+        statutory_penalty_clause:
+          type: string
+        total_employees:
+          type: integer
+        total_gross_salaries:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        total_employee_contribution:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        total_employer_contribution:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        total_tier_1_payable_to_ssnit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        total_tier_2_payable_to_trustee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        grand_total_contributions:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,2})?$
+        schedule:
+          type: array
+          items:
+            $ref: '#/components/schemas/SSNITEmployeeScheduleItemOutput'
+      required:
+      - days_until_deadline
+      - employer_name
+      - employer_ssnit_number
+      - grand_total_contributions
+      - is_overdue
+      - period_label
+      - period_month
+      - period_year
+      - schedule
+      - statutory_penalty_clause
+      - submission_deadline
+      - total_employee_contribution
+      - total_employees
+      - total_employer_contribution
+      - total_gross_salaries
+      - total_tier_1_payable_to_ssnit
+      - total_tier_2_payable_to_trustee
     SubscriptionPlanInputRequest:
       type: object
       description: Input payload for Superadmin creating or updating a dynamic subscription
@@ -17928,11 +18514,20 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
-      required:
-      - gross_salary
+        taxable_income:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
     TaxCalculationOutput:
       type: object
       properties:
+        country_code:
+          type: string
+          maxLength: 2
+        gross_salary:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
         employee_ssnit:
           type: string
           format: decimal
@@ -17945,10 +18540,31 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        taxable_income:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        paye_tax:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        net_salary:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        effective_paye_rate_pct:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        paye_breakdown:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
       required:
-      - employee_ssnit
-      - employer_ssnit
-      - total_ssnit_liability
+      - country_code
+      - paye_tax
+      - taxable_income
     TaxRuleCreateInputRequest:
       type: object
       properties:

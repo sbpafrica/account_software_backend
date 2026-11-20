@@ -100,3 +100,77 @@ class VATReturnSummaryOutputSerializer(serializers.Serializer):
     is_refund_credit = serializers.BooleanField()
     withholding_tax_payable = serializers.DecimalField(max_digits=18, decimal_places=4)
     total_statutory_liability = serializers.DecimalField(max_digits=18, decimal_places=4)
+
+
+# ==============================================================================
+# SSNIT STATUTORY PENSION RETURN & SCHEDULE SERIALIZERS (ACT 766)
+# ==============================================================================
+class SSNITEmployeeItemInputSerializer(serializers.Serializer):
+    employee_name = serializers.CharField(max_length=255)
+    ssnit_number = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
+    ghana_card_number = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
+    gross_salary = serializers.DecimalField(max_digits=18, decimal_places=4)
+
+
+class SSNITScheduleGenerateInputSerializer(serializers.Serializer):
+    employer_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    employer_ssnit_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    month = serializers.IntegerField(min_value=1, max_value=12)
+    year = serializers.IntegerField(min_value=2000, max_value=2100)
+    employees = serializers.ListField(
+        child=SSNITEmployeeItemInputSerializer(),
+        min_length=1
+    )
+
+
+class SSNITEmployeeScheduleItemOutputSerializer(serializers.Serializer):
+    serial_no = serializers.IntegerField()
+    employee_name = serializers.CharField()
+    ssnit_number = serializers.CharField()
+    ghana_card_number = serializers.CharField()
+    gross_salary = serializers.DecimalField(max_digits=18, decimal_places=2)
+    employee_contribution = serializers.DecimalField(max_digits=18, decimal_places=2)
+    employer_contribution = serializers.DecimalField(max_digits=18, decimal_places=2)
+    total_contribution = serializers.DecimalField(max_digits=18, decimal_places=2)
+    tier_1_ssnit = serializers.DecimalField(max_digits=18, decimal_places=2)
+    tier_2_trustee = serializers.DecimalField(max_digits=18, decimal_places=2)
+
+
+class SSNITScheduleOutputSerializer(serializers.Serializer):
+    employer_name = serializers.CharField()
+    employer_ssnit_number = serializers.CharField()
+    period_month = serializers.IntegerField()
+    period_year = serializers.IntegerField()
+    period_label = serializers.CharField()
+    submission_deadline = serializers.CharField()
+    days_until_deadline = serializers.IntegerField()
+    is_overdue = serializers.BooleanField()
+    statutory_penalty_clause = serializers.CharField()
+    total_employees = serializers.IntegerField()
+    total_gross_salaries = serializers.DecimalField(max_digits=18, decimal_places=2)
+    total_employee_contribution = serializers.DecimalField(max_digits=18, decimal_places=2)
+    total_employer_contribution = serializers.DecimalField(max_digits=18, decimal_places=2)
+    total_tier_1_payable_to_ssnit = serializers.DecimalField(max_digits=18, decimal_places=2)
+    total_tier_2_payable_to_trustee = serializers.DecimalField(max_digits=18, decimal_places=2)
+    grand_total_contributions = serializers.DecimalField(max_digits=18, decimal_places=2)
+    schedule = serializers.ListField(child=SSNITEmployeeScheduleItemOutputSerializer())
+
+
+class SSNITReturnSummaryOutputSerializer(serializers.Serializer):
+    employer_name = serializers.CharField()
+    employer_ssnit_number = serializers.CharField()
+    period_month = serializers.IntegerField()
+    period_year = serializers.IntegerField()
+    period_label = serializers.CharField()
+    submission_deadline = serializers.CharField()
+    days_until_deadline = serializers.IntegerField()
+    is_overdue = serializers.BooleanField()
+    total_employees = serializers.IntegerField()
+    total_gross_salaries = serializers.DecimalField(max_digits=18, decimal_places=2)
+    total_employee_share = serializers.DecimalField(max_digits=18, decimal_places=2)
+    total_employer_share = serializers.DecimalField(max_digits=18, decimal_places=2)
+    tier_1_payable_ssnit = serializers.DecimalField(max_digits=18, decimal_places=2)
+    tier_2_payable_trustee = serializers.DecimalField(max_digits=18, decimal_places=2)
+    total_statutory_pension_liability = serializers.DecimalField(max_digits=18, decimal_places=2)
+    statutory_penalty_clause = serializers.CharField()
+

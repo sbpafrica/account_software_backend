@@ -80,14 +80,181 @@ class GhanaTaxEngine:
 
     @staticmethod
     def calculate_ssnit(gross_salary: Decimal) -> dict:
+        """
+        Ghana Statutory National Pension Calculations (National Pensions Act, 2008 - Act 766):
+        - Employee Contribution: 5.5% (Deducted from basic/gross pay, tax exempt)
+        - Employer Contribution: 13.0% (Borne by employer)
+        - Total Statutory Rate: 18.5%
+
+        Remittance Tiers:
+        - Tier 1 (First Tier Mandatory Basic Social Security): 13.5% remitted directly to SSNIT
+        - Tier 2 (Second Tier Mandatory Occupational Pension Scheme): 5.0% remitted to licensed Private Trustee
+        """
         gross_salary = Decimal(str(gross_salary))
         employee_share = (gross_salary * Decimal('0.055')).quantize(Decimal('0.01'))
         employer_share = (gross_salary * Decimal('0.130')).quantize(Decimal('0.01'))
+        total_liability = employee_share + employer_share
+
+        tier_1_ssnit = (gross_salary * Decimal('0.135')).quantize(Decimal('0.01'))
+        tier_2_trustee = (gross_salary * Decimal('0.050')).quantize(Decimal('0.01'))
+
         return {
             'employee_ssnit': employee_share,
             'employer_ssnit': employer_share,
-            'total_ssnit_liability': employee_share + employer_share
+            'total_ssnit_liability': total_liability,
+            'tier_1_ssnit': tier_1_ssnit,
+            'tier_2_trustee': tier_2_trustee,
+            'employee_rate_pct': Decimal('5.50'),
+            'employer_rate_pct': Decimal('13.00'),
+            'total_rate_pct': Decimal('18.50'),
+            'tier_1_rate_pct': Decimal('13.50'),
+            'tier_2_rate_pct': Decimal('5.00'),
         }
+
+    @staticmethod
+    def generate_ssnit_monthly_schedule(
+        *,
+        employer_name: str,
+        employer_ssnit_id: str,
+        month: int,
+        year: int,
+        employees: list[dict]
+    ) -> dict:
+        """
+        Generates the Ghana SSNIT Monthly Contribution Return Schedule.
+        Under Act 766, contributions are due by the 14th day of the following month.
+        """
+        import datetime
+        from django.utils import timezone
+
+        # Calculate statutory deadline: 14th of following month
+        if month == 12:
+            next_month = 1
+            next_year = year + 1
+        else:
+            next_month = month + 1
+            next_year = year
+        deadline_date = datetime.date(next_year, next_month, 14)
+        today = timezone.now().date()
+        days_until_deadline = (deadline_date - today).days
+
+        schedule_items = []
+        total_gross = Decimal('0.00')
+        total_employee = Decimal('0.00')
+        total_employer = Decimal('0.00')
+        total_tier_1 = Decimal('0.00')
+        total_tier_2 = Decimal('0.00')
+        total_contributions = Decimal('0.00')
+
+        for idx, emp in enumerate(employees, start=1):
+            gross = Decimal(str(emp.get('gross_salary', 0.0)))
+            calc = GhanaTaxEngine.calculate_ssnit(gross)
+
+            item = {
+                'serial_no': idx,
+                'employee_name': emp.get('employee_name', f"Employee {idx}"),
+                'ssnit_number': emp.get('ssnit_number', ''),
+                'ghana_card_number': emp.get('ghana_card_number', ''),
+                'gross_salary': gross.quantize(Decimal('0.01')),
+                'employee_contribution': calc['employee_ssnit'],
+                'employer_contribution': calc['employer_ssnit'],
+                'total_contribution': calc['total_ssnit_liability'],
+                'tier_1_ssnit': calc['tier_1_ssnit'],
+                'tier_2_trustee': calc['tier_2_trustee'],
+            }
+            schedule_items.append(item)
+
+            total_gross += gross
+            total_employee += calc['employee_ssnit']
+            total_employer += calc['employer_ssnit']
+            total_tier_1 += calc['tier_1_ssnit']
+            total_tier_2 += calc['tier_2_trustee']
+            total_contributions += calc['total_ssnit_liability']
+
+        month_names = ["January", "February", "March", "April", "May", "June",
+                       "July", "August", "September", "October", "November", "December"]
+        period_label = f"{month_names[month - 1]} {year}" if 1 <= month <= 12 else f"{month}/{year}"
+
+        return {
+            'employer_name': employer_name,
+            'employer_ssnit_number': employer_ssnit_id,
+            'period_month': month,
+            'period_year': year,
+            'period_label': period_label,
+            'submission_deadline': deadline_date.isoformat(),
+            'days_until_deadline': days_until_deadline,
+            'is_overdue': days_until_deadline < 0,
+            'statutory_penalty_clause': "Under Act 766 Section 64, late remittances attract a 3% compound monthly penalty.",
+            'total_employees': len(schedule_items),
+            'total_gross_salaries': total_gross.quantize(Decimal('0.01')),
+            'total_employee_contribution': total_employee.quantize(Decimal('0.01')),
+            'total_employer_contribution': total_employer.quantize(Decimal('0.01')),
+            'total_tier_1_payable_to_ssnit': total_tier_1.quantize(Decimal('0.01')),
+            'total_tier_2_payable_to_trustee': total_tier_2.quantize(Decimal('0.01')),
+            'grand_total_contributions': total_contributions.quantize(Decimal('0.01')),
+            'schedule': schedule_items,
+        }
+
+    @staticmethod
+    def export_ssnit_schedule_csv(report_data: dict) -> str:
+        """
+        Exports the SSNIT Monthly Contribution Return Schedule as CSV string.
+        """
+        import io
+        import csv
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        writer.writerow(["SSNIT MONTHLY CONTRIBUTION RETURN (ACT 766)"])
+        writer.writerow(["Employer Name:", report_data.get('employer_name', '')])
+        writer.writerow(["Employer SSNIT Number:", report_data.get('employer_ssnit_number', '')])
+        writer.writerow(["Contribution Period:", report_data.get('period_label', '')])
+        writer.writerow(["Submission Deadline:", report_data.get('submission_deadline', '')])
+        writer.writerow([])
+
+        writer.writerow([
+            "Item No",
+            "SSNIT Number",
+            "Employee Full Name",
+            "Ghana Card Number",
+            "Basic/Gross Salary (GHS)",
+            "Employee Share (5.5%)",
+            "Employer Share (13.0%)",
+            "Total Contribution (18.5%)",
+            "Tier 1 to SSNIT (13.5%)",
+            "Tier 2 to Trustee (5.0%)",
+        ])
+
+        for item in report_data.get('schedule', []):
+            writer.writerow([
+                item['serial_no'],
+                item['ssnit_number'],
+                item['employee_name'],
+                item['ghana_card_number'],
+                f"{Decimal(str(item['gross_salary'])):.2f}",
+                f"{Decimal(str(item['employee_contribution'])):.2f}",
+                f"{Decimal(str(item['employer_contribution'])):.2f}",
+                f"{Decimal(str(item['total_contribution'])):.2f}",
+                f"{Decimal(str(item['tier_1_ssnit'])):.2f}",
+                f"{Decimal(str(item['tier_2_trustee'])):.2f}",
+            ])
+
+        writer.writerow([])
+        writer.writerow([
+            "TOTALS",
+            "",
+            f"{report_data.get('total_employees', 0)} Employees",
+            "",
+            f"{Decimal(str(report_data.get('total_gross_salaries', 0))):.2f}",
+            f"{Decimal(str(report_data.get('total_employee_contribution', 0))):.2f}",
+            f"{Decimal(str(report_data.get('total_employer_contribution', 0))):.2f}",
+            f"{Decimal(str(report_data.get('grand_total_contributions', 0))):.2f}",
+            f"{Decimal(str(report_data.get('total_tier_1_payable_to_ssnit', 0))):.2f}",
+            f"{Decimal(str(report_data.get('total_tier_2_payable_to_trustee', 0))):.2f}",
+        ])
+
+        return output.getvalue()
 
     @staticmethod
     def calculate_vendor_wht(service_amount: Decimal, category: str = 'SERVICES') -> dict:

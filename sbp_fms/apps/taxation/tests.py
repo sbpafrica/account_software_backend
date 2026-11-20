@@ -179,5 +179,88 @@ class TestTaxationCRUD:
         res7 = GhanaTaxEngine.calculate_paye(Decimal("60000.00"))
         assert res7["paye_tax"] == Decimal("17121.10")
 
+    def test_ssnit_tier_calculations_and_schedule_reports(self, api_client, superuser):
+        from apps.taxation.engines import GhanaTaxEngine
+
+        api_client.force_authenticate(user=superuser)
+
+        # 1. Test calculation engine (Act 766)
+        # Gross = 10,000.00 GHS
+        # Employee 5.5% = 550.00
+        # Employer 13.0% = 1,300.00
+        # Total 18.5% = 1,850.00
+        # Tier 1 to SSNIT (13.5%) = 1,350.00
+        # Tier 2 to Trustee (5.0%) = 500.00
+        calc = GhanaTaxEngine.calculate_ssnit(Decimal("10000.00"))
+        assert calc["employee_ssnit"] == Decimal("550.00")
+        assert calc["employer_ssnit"] == Decimal("1300.00")
+        assert calc["total_ssnit_liability"] == Decimal("1850.00")
+        assert calc["tier_1_ssnit"] == Decimal("1350.00")
+        assert calc["tier_2_trustee"] == Decimal("500.00")
+
+        # 2. Test SSNIT Return Summary API
+        summary_url = reverse("ssnit-return-summary-admin")
+        res_sum = api_client.get(summary_url, {"month": 10, "year": 2026})
+        assert res_sum.status_code == status.HTTP_200_OK
+        data = res_sum.data["data"]
+        assert "period_label" in data
+        assert "submission_deadline" in data
+        assert "statutory_penalty_clause" in data
+        assert "tier_1_payable_ssnit" in data
+        assert "tier_2_payable_trustee" in data
+
+        # 3. Test SSNIT Itemized Schedule Generation API
+        schedule_url = reverse("ssnit-schedule-generate-admin")
+        payload = {
+            "employer_name": "SBP Africa Technologies Ltd",
+            "employer_ssnit_number": "SSNIT-GH-829102",
+            "month": 10,
+            "year": 2026,
+            "employees": [
+                {
+                    "employee_name": "Kofi Mensah",
+                    "ssnit_number": "C10048291039",
+                    "ghana_card_number": "GHA-721948291-3",
+                    "gross_salary": 8000.0
+                },
+                {
+                    "employee_name": "Ama Serwaa",
+                    "ssnit_number": "C20094819283",
+                    "ghana_card_number": "GHA-849102948-1",
+                    "gross_salary": 12000.0
+                }
+            ]
+        }
+        res_sched = api_client.post(schedule_url, payload, format="json")
+        assert res_sched.status_code == status.HTTP_200_OK
+        sched_data = res_sched.data["data"]
+        assert sched_data["total_employees"] == 2
+        # Gross = 20,000.00
+        # Employee 5.5% = 1,100.00
+        # Employer 13.0% = 2,600.00
+        # Total 18.5% = 3,700.00
+        # Tier 1 = 2,700.00 (13.5%)
+        # Tier 2 = 1,000.00 (5.0%)
+        assert Decimal(str(sched_data["total_gross_salaries"])) == Decimal("20000.00")
+        assert Decimal(str(sched_data["total_employee_contribution"])) == Decimal("1100.00")
+        assert Decimal(str(sched_data["total_employer_contribution"])) == Decimal("2600.00")
+        assert Decimal(str(sched_data["total_tier_1_payable_to_ssnit"])) == Decimal("2700.00")
+        assert Decimal(str(sched_data["total_tier_2_payable_to_trustee"])) == Decimal("1000.00")
+        assert Decimal(str(sched_data["grand_total_contributions"])) == Decimal("3700.00")
+        assert len(sched_data["schedule"]) == 2
+
+        # 4. Test SSNIT CSV Report Export API
+        export_url = reverse("ssnit-report-export-admin")
+        res_exp = api_client.post(export_url, payload, format="json")
+        assert res_exp.status_code == status.HTTP_200_OK
+        assert "text/csv" in res_exp["Content-Type"]
+        assert "attachment; filename=" in res_exp["Content-Disposition"]
+        csv_text = res_exp.content.decode("utf-8")
+        assert "SSNIT MONTHLY CONTRIBUTION RETURN (ACT 766)" in csv_text
+        assert "Kofi Mensah" in csv_text
+        assert "Ama Serwaa" in csv_text
+        assert "TOTALS" in csv_text
+
+
 
 

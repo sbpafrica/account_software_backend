@@ -118,3 +118,87 @@ def vat_return_summary_get(*, start_date: Optional[date] = None,
         'withholding_tax_payable': total_wht_payable,
         'total_statutory_liability': total_payable_to_revenue_authority
     }
+
+
+def ssnit_return_summary_get(*, month: Optional[int] = None, year: Optional[int] = None, organization_id = None) -> dict:
+    """
+    Computes Ghana SSNIT Monthly Return Summary per Act 766.
+    Extracts workforce payroll batches and evaluates statutory Tier 1 (13.5%) & Tier 2 (5.0%) liabilities.
+    """
+    import datetime
+    from apps.ledger.models import CompanyProfile
+    from apps.payroll_escrow.models import PayrollBatch
+    from apps.organizations.models import Organization
+    from apps.taxation.engines import GhanaTaxEngine
+
+    now = timezone.now().date()
+    if not year:
+        year = now.year
+    if not month:
+        # Default to preceding month (standard tax return filing cycle)
+        month = now.month - 1 if now.month > 1 else 12
+        if now.month == 1:
+            year -= 1
+
+    # 1. Employer details
+    employer_name = "SBP Africa Group"
+    employer_ssnit = "SSNIT-GH-001928"
+
+    org = None
+    if organization_id:
+        org = Organization.objects.filter(id=organization_id).first()
+
+    company = CompanyProfile.objects.first()
+    if company:
+        employer_name = company.company_name
+        employer_ssnit = company.tax_identification_number or company.registration_number or employer_ssnit
+    elif org:
+        employer_name = org.name
+
+    # 2. Query payroll batches for this month/year
+    batches = PayrollBatch.objects.filter(month=month, year=year)
+    if org:
+        batches = batches.filter(client_id=org.id)
+
+    total_gross = Decimal('0.00')
+    batch_count = batches.count()
+
+    if batch_count > 0:
+        for b in batches:
+            total_gross += (b.total_net_salaries + b.total_statutory_taxes)
+
+    ssnit_calc = GhanaTaxEngine.calculate_ssnit(total_gross)
+
+    # Calculate statutory deadline: 14th of following month
+    if month == 12:
+        next_m = 1
+        next_y = year + 1
+    else:
+        next_m = month + 1
+        next_y = year
+    deadline_date = datetime.date(next_y, next_m, 14)
+    days_left = (deadline_date - now).days
+
+    month_names = ["January", "February", "March", "April", "May", "June",
+                   "July", "August", "September", "October", "November", "December"]
+    period_label = f"{month_names[month - 1]} {year}" if 1 <= month <= 12 else f"{month}/{year}"
+
+    return {
+        'employer_name': employer_name,
+        'employer_ssnit_number': employer_ssnit,
+        'period_month': month,
+        'period_year': year,
+        'period_label': period_label,
+        'submission_deadline': deadline_date.isoformat(),
+        'days_until_deadline': days_left,
+        'is_overdue': days_left < 0,
+        'total_employees': batch_count if batch_count > 0 else 0,
+        'total_gross_salaries': total_gross.quantize(Decimal('0.01')),
+        'total_employee_share': ssnit_calc['employee_ssnit'],
+        'total_employer_share': ssnit_calc['employer_ssnit'],
+        'tier_1_payable_ssnit': ssnit_calc['tier_1_ssnit'],
+        'tier_2_payable_trustee': ssnit_calc['tier_2_trustee'],
+        'total_statutory_pension_liability': ssnit_calc['total_ssnit_liability'],
+        'statutory_penalty_clause': "Under Act 766 Section 64, remittances after the 14th attract a 3% compounding monthly penalty."
+    }
+
