@@ -9,13 +9,18 @@ from apps.common.pagination import CustomPageNumberPagination, paginate_queryset
 from apps.users.permissions import HasPermissionCode, CountryScopedAccess
 from apps.receivables.models import Client
 from apps.receivables.selectors import (
-    client_list, client_detail, client_invoice_list, client_invoice_detail, aging_report_get
+    client_list, client_detail, client_invoice_list, client_invoice_detail, aging_report_get,
+    client_invoice_template_list, client_invoice_template_detail, invoice_template_presets_list,
+    client_invoice_render_data, invoice_builder_preview_data
 )
 from apps.receivables.services import ReceivablesService
 from apps.receivables.serializers import (
     ClientOutputSerializer, ClientCreateInputSerializer, ClientUpdateInputSerializer,
     ClientInvoiceOutputSerializer, ClientInvoiceCreateInputSerializer, ClientInvoiceUpdateInputSerializer,
-    AgingReportOutputSerializer
+    AgingReportOutputSerializer,
+    ClientInvoiceTemplateOutputSerializer, ClientInvoiceTemplateCreateInputSerializer,
+    ClientInvoiceTemplateUpdateInputSerializer, InvoiceBuilderPreviewInputSerializer,
+    ApplyPresetInputSerializer, ClientInvoiceRenderOutputSerializer
 )
 
 
@@ -181,6 +186,10 @@ class ClientInvoiceListAdminApi(APIView):
             due_date=data['due_date'],
             total_amount=data.get('total_amount'),
             lines_data=data.get('lines'),
+            template_id=data.get('template_id'),
+            custom_fields=data.get('custom_fields'),
+            notes=data.get('notes'),
+            terms_and_conditions=data.get('terms_and_conditions'),
             user=request.user
         )
         return api_success(
@@ -392,5 +401,215 @@ class CustomerStatementAdminApi(APIView):
         date_to = request.query_params.get('date_to')
         statement = customer_statement_get(client_id=str(client_id), date_from=date_from, date_to=date_to)
         return api_success(data=statement, message="Customer statement generated successfully.")
+
+
+class ClientInvoiceTemplateListAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('receivables:read')()]
+
+    @extend_schema(
+        tags=['Receivables - Invoice Builder'],
+        operation_id='admin_receivables_invoice_template_list',
+        summary='List invoice design templates and custom field configurations',
+        description='Returns all invoice templates with header/line custom field definitions, colors, and layout styles. Filterable by client_id.',
+        parameters=[
+            OpenApiParameter(name='client_id', description='Filter templates for a specific client entity (also includes global defaults)', required=False, type=str)
+        ],
+        responses={
+            status.HTTP_200_OK: ClientInvoiceTemplateOutputSerializer(many=True),
+            status.HTTP_403_FORBIDDEN: dict
+        }
+    )
+    def get(self, request):
+        client_id = request.query_params.get('client_id')
+        templates = client_invoice_template_list(client_id=client_id)
+        return api_success(
+            data=ClientInvoiceTemplateOutputSerializer(templates, many=True).data,
+            message="Invoice templates retrieved successfully."
+        )
+
+    @extend_schema(
+        tags=['Receivables - Invoice Builder'],
+        operation_id='admin_receivables_invoice_template_create',
+        summary='Create new custom invoice template / layout',
+        description='Creates a custom invoice builder configuration with dynamic header custom fields, line custom fields, styling, and compliance toggles.',
+        request=ClientInvoiceTemplateCreateInputSerializer,
+        responses={
+            status.HTTP_201_CREATED: ClientInvoiceTemplateOutputSerializer,
+            status.HTTP_400_BAD_REQUEST: dict,
+            status.HTTP_403_FORBIDDEN: dict
+        }
+    )
+    def post(self, request):
+        if not request.user.has_permission_code('receivables:create'):
+            return Response({'detail': 'Permission denied: receivables:create required'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = ClientInvoiceTemplateCreateInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        tmpl = ReceivablesService.invoice_template_create(**serializer.validated_data)
+        return api_success(
+            data=ClientInvoiceTemplateOutputSerializer(tmpl).data,
+            message=f"Invoice template '{tmpl.template_name}' created successfully.",
+            status_code=status.HTTP_201_CREATED
+        )
+
+
+class ClientInvoiceTemplateDetailAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('receivables:read')()]
+
+    @extend_schema(
+        tags=['Receivables - Invoice Builder'],
+        operation_id='admin_receivables_invoice_template_detail',
+        summary='Retrieve invoice template configuration',
+        responses={
+            status.HTTP_200_OK: ClientInvoiceTemplateOutputSerializer,
+            status.HTTP_404_NOT_FOUND: dict
+        }
+    )
+    def get(self, request, template_id):
+        tmpl = client_invoice_template_detail(template_id=template_id)
+        return api_success(data=ClientInvoiceTemplateOutputSerializer(tmpl).data, message="Template retrieved successfully.")
+
+    @extend_schema(
+        tags=['Receivables - Invoice Builder'],
+        operation_id='admin_receivables_invoice_template_update',
+        summary='Update invoice template configuration',
+        request=ClientInvoiceTemplateUpdateInputSerializer,
+        responses={
+            status.HTTP_200_OK: ClientInvoiceTemplateOutputSerializer,
+            status.HTTP_400_BAD_REQUEST: dict,
+            status.HTTP_404_NOT_FOUND: dict
+        }
+    )
+    def put(self, request, template_id):
+        if not request.user.has_permission_code('receivables:create'):
+            return Response({'detail': 'Permission denied: receivables:create required'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = ClientInvoiceTemplateUpdateInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        tmpl = ReceivablesService.invoice_template_update(template_id=template_id, **serializer.validated_data)
+        return api_success(data=ClientInvoiceTemplateOutputSerializer(tmpl).data, message="Template updated successfully.")
+
+    @extend_schema(
+        tags=['Receivables - Invoice Builder'],
+        operation_id='admin_receivables_invoice_template_partial_update',
+        summary='Partially update invoice template configuration',
+        request=ClientInvoiceTemplateUpdateInputSerializer,
+        responses={
+            status.HTTP_200_OK: ClientInvoiceTemplateOutputSerializer,
+            status.HTTP_400_BAD_REQUEST: dict,
+            status.HTTP_404_NOT_FOUND: dict
+        }
+    )
+    def patch(self, request, template_id):
+        return self.put(request, template_id)
+
+    @extend_schema(
+        tags=['Receivables - Invoice Builder'],
+        operation_id='admin_receivables_invoice_template_delete',
+        summary='Delete invoice template',
+        responses={
+            status.HTTP_200_OK: dict,
+            status.HTTP_404_NOT_FOUND: dict
+        }
+    )
+    def delete(self, request, template_id):
+        if not request.user.has_permission_code('receivables:create'):
+            return Response({'detail': 'Permission denied: receivables:create required'}, status=status.HTTP_403_FORBIDDEN)
+        ReceivablesService.invoice_template_delete(template_id=template_id)
+        return api_success(message="Template deleted successfully.")
+
+
+class InvoiceTemplatePresetsAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('receivables:read')()]
+
+    @extend_schema(
+        tags=['Receivables - Invoice Builder'],
+        operation_id='admin_receivables_invoice_template_presets_list',
+        summary='List pre-built industry invoice presets',
+        description='Returns pre-configured templates for Outsourced Workforce Staffing, Standard Corporate, Executive Recruitment, and Management Consulting.',
+        responses={
+            status.HTTP_200_OK: dict
+        }
+    )
+    def get(self, request):
+        presets = invoice_template_presets_list()
+        return api_success(data=presets, message="Invoice presets retrieved successfully.")
+
+    @extend_schema(
+        tags=['Receivables - Invoice Builder'],
+        operation_id='admin_receivables_invoice_template_preset_apply',
+        summary='Apply a pre-built industry preset to a client or as global default',
+        description='Creates a new template directly from an industry preset code (e.g. STAFFING_WORKFORCE, STANDARD_CORPORATE, RECRUITMENT_PLACEMENTS, CONSULTING_MANAGEMENT).',
+        request=ApplyPresetInputSerializer,
+        responses={
+            status.HTTP_201_CREATED: ClientInvoiceTemplateOutputSerializer,
+            status.HTTP_400_BAD_REQUEST: dict
+        }
+    )
+    def post(self, request):
+        if not request.user.has_permission_code('receivables:create'):
+            return Response({'detail': 'Permission denied: receivables:create required'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = ApplyPresetInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        tmpl = ReceivablesService.invoice_template_apply_preset(
+            preset_code=serializer.validated_data['preset_code'],
+            client_id=serializer.validated_data.get('client_id'),
+            template_name=serializer.validated_data.get('template_name'),
+            is_default=serializer.validated_data.get('is_default', False)
+        )
+        return api_success(
+            data=ClientInvoiceTemplateOutputSerializer(tmpl).data,
+            message=f"Preset '{serializer.validated_data['preset_code']}' applied successfully as '{tmpl.template_name}'.",
+            status_code=status.HTTP_201_CREATED
+        )
+
+
+class InvoiceBuilderPreviewAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('receivables:read')()]
+
+    @extend_schema(
+        tags=['Receivables - Invoice Builder'],
+        operation_id='admin_receivables_invoice_builder_preview',
+        summary='Real-time interactive invoice builder preview',
+        description='Renders a live styled preview packet for the frontend given any template configuration and optional sample invoice data.',
+        request=InvoiceBuilderPreviewInputSerializer,
+        responses={
+            status.HTTP_200_OK: ClientInvoiceRenderOutputSerializer,
+            status.HTTP_400_BAD_REQUEST: dict
+        }
+    )
+    def post(self, request):
+        serializer = InvoiceBuilderPreviewInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        template_data = serializer.validated_data.get('template')
+        template_id = serializer.validated_data.get('template_id')
+        if not template_data and template_id:
+            tmpl = client_invoice_template_detail(template_id=template_id)
+            template_data = ClientInvoiceTemplateOutputSerializer(tmpl).data
+        elif not template_data:
+            from apps.receivables.presets import get_preset_by_code
+            template_data = get_preset_by_code('STAFFING_WORKFORCE')
+
+        sample = serializer.validated_data.get('sample_invoice', {})
+        preview_data = invoice_builder_preview_data(template_data=template_data, sample_invoice=sample)
+        return api_success(data=preview_data, message="Invoice preview generated successfully.")
+
+
+class ClientInvoiceRenderAdminApi(APIView):
+    permission_classes = [IsAuthenticated, HasPermissionCode('receivables:read')()]
+
+    @extend_schema(
+        tags=['Receivables - Invoices Admin'],
+        operation_id='admin_receivables_invoice_render',
+        summary='Retrieve complete rendered invoice packet with template styling and custom fields',
+        description='Fetches the full structured invoice packet formatted according to the client template, with custom header fields, custom line columns, company legal details, bank remittance accounts, and tax breakdowns.',
+        responses={
+            status.HTTP_200_OK: ClientInvoiceRenderOutputSerializer,
+            status.HTTP_404_NOT_FOUND: dict
+        }
+    )
+    def get(self, request, invoice_id):
+        render_data = client_invoice_render_data(invoice_id=invoice_id)
+        return api_success(data=render_data, message="Rendered invoice data retrieved successfully.")
+
 
 

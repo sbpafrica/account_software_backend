@@ -1,5 +1,8 @@
 from django.contrib import admin
-from apps.receivables.models import Client, ClientInvoice, ClientInvoiceLine, PaymentReceipt, ReceiptAllocation
+from apps.receivables.models import (
+    Client, ClientInvoice, ClientInvoiceLine, PaymentReceipt, ReceiptAllocation,
+    ClientInvoiceTemplate
+)
 
 
 class ClientInvoiceLineInline(admin.TabularInline):
@@ -12,6 +15,13 @@ class ReceiptAllocationInline(admin.TabularInline):
     extra = 1
 
 
+@admin.register(ClientInvoiceTemplate)
+class ClientInvoiceTemplateAdmin(admin.ModelAdmin):
+    list_display = ('template_name', 'client', 'layout_style', 'primary_color', 'is_default', 'is_active', 'created_at')
+    list_filter = ('layout_style', 'is_default', 'is_active')
+    search_fields = ('template_name', 'client__name', 'invoice_title')
+
+
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
     list_display = ('name', 'code', 'country_code', 'category', 'tax_id', 'is_active', 'created_at')
@@ -21,8 +31,8 @@ class ClientAdmin(admin.ModelAdmin):
 
 @admin.register(ClientInvoice)
 class ClientInvoiceAdmin(admin.ModelAdmin):
-    list_display = ('invoice_number', 'client', 'issue_date', 'due_date', 'total_amount', 'amount_paid', 'status')
-    list_filter = ('status',)
+    list_display = ('invoice_number', 'client', 'template', 'issue_date', 'due_date', 'total_amount', 'amount_paid', 'status')
+    list_filter = ('status', 'template')
     search_fields = ('invoice_number', 'client__name')
     inlines = [ClientInvoiceLineInline]
 

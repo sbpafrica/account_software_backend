@@ -10,7 +10,8 @@ from apps.ledger.services import LedgerService
 from apps.ledger.models import Account, AccountType
 from .models import (
     Client, ClientInvoice, ClientInvoiceStatus,
-    ClientInvoiceLine, PaymentReceipt, PaymentReceiptStatus, ReceiptAllocation
+    ClientInvoiceLine, PaymentReceipt, PaymentReceiptStatus, ReceiptAllocation,
+    ClientInvoiceTemplate
 )
 
 logger = logging.getLogger(__name__)
@@ -93,9 +94,34 @@ class ReceivablesService:
     @transaction.atomic
     def invoice_create(*, invoice_number: str, client: Client, issue_date, due_date,
                        total_amount: Decimal = None, lines_data: list = None,
+                       template_id = None, custom_fields: dict = None,
+                       notes: str = None, terms_and_conditions: str = None,
                        status: str = ClientInvoiceStatus.ISSUED, user=None) -> ClientInvoice:
         if ClientInvoice.objects.filter(invoice_number=invoice_number).exists():
             raise ValidationError(f"Invoice number '{invoice_number}' already exists.")
+
+        template = None
+        if template_id:
+            template = ClientInvoiceTemplate.objects.filter(id=template_id).first()
+        elif client.default_template:
+            template = client.default_template
+        elif ClientInvoiceTemplate.objects.filter(is_default=True).exists():
+            template = ClientInvoiceTemplate.objects.filter(is_default=True).first()
+
+        c_fields = dict(custom_fields or {})
+        if template:
+            defs = template.header_custom_fields or template.custom_field_definitions or []
+            missing = []
+            for f in defs:
+                if f.get('required') and not c_fields.get(f['key']):
+                    missing.append(f.get('label', f['key']))
+            if missing:
+                raise ValidationError(f"Missing required invoice custom fields: {', '.join(missing)}")
+
+            if notes is None:
+                notes = template.default_notes
+            if terms_and_conditions is None:
+                terms_and_conditions = template.default_terms
 
         subtotal = Decimal('0.0000')
         tax_total = Decimal('0.0000')
@@ -120,6 +146,7 @@ class ReceivablesService:
         inv = ClientInvoice.objects.create(
             invoice_number=invoice_number,
             client=client,
+            template=template,
             issue_date=issue_date,
             due_date=due_date,
             subtotal=subtotal,
@@ -127,6 +154,9 @@ class ReceivablesService:
             discount_amount=discount_total,
             total_amount=calc_total,
             status=status,
+            notes=notes or '',
+            terms_and_conditions=terms_and_conditions or '',
+            custom_fields=c_fields,
             created_by=user
         )
 
@@ -148,7 +178,8 @@ class ReceivablesService:
                     tax_code=line.get('tax_code', 'EXEMPT'),
                     tax_rate=rate,
                     tax_amount=line_tax,
-                    line_total=line_sub + line_tax
+                    line_total=line_sub + line_tax,
+                    custom_fields=line.get('custom_fields', {})
                 )
 
         if status == ClientInvoiceStatus.ISSUED:
@@ -159,6 +190,127 @@ class ReceivablesService:
 
         CacheManager.invalidate_receivables()
         return inv
+
+    # =========================================================================
+    # INVOICE TEMPLATE & BUILDER SERVICES
+    # =========================================================================
+
+    @staticmethod
+    @transaction.atomic
+    def invoice_template_create(*, template_name: str, client_id=None,
+                                layout_style: str = 'MODERN', preset_code: str = '',
+                                primary_color: str = '#102a43', secondary_color: str = '#243b53',
+                                accent_color: str = '#0ea5e9', logo_url: str = '',
+                                show_logo: bool = True, font_family: str = 'Inter, sans-serif',
+                                invoice_title: str = 'TAX INVOICE', show_tax_breakdown: bool = True,
+                                show_bank_details: bool = True, show_due_date_badge: bool = True,
+                                show_discount: bool = True, show_unit_of_measure: bool = True,
+                                default_notes: str = '', default_terms: str = '', footer_text: str = '',
+                                header_custom_fields: list = None, line_custom_fields: list = None,
+                                is_default: bool = False, is_active: bool = True) -> ClientInvoiceTemplate:
+        client = Client.objects.filter(id=client_id).first() if client_id else None
+
+        if is_default:
+            ClientInvoiceTemplate.objects.filter(client=client, is_default=True).update(is_default=False)
+
+        tmpl = ClientInvoiceTemplate.objects.create(
+            template_name=template_name.strip(),
+            preset_code=preset_code.strip() if preset_code else '',
+            client=client,
+            layout_style=layout_style,
+            primary_color=primary_color,
+            secondary_color=secondary_color,
+            accent_color=accent_color,
+            logo_url=logo_url,
+            show_logo=show_logo,
+            font_family=font_family,
+            invoice_title=invoice_title,
+            show_tax_breakdown=show_tax_breakdown,
+            show_bank_details=show_bank_details,
+            show_due_date_badge=show_due_date_badge,
+            show_discount=show_discount,
+            show_unit_of_measure=show_unit_of_measure,
+            default_notes=default_notes or 'Thank you for partnering with SBP Africa Group.',
+            default_terms=default_terms or 'Payment is due within payment terms.',
+            footer_text=footer_text or 'SBP Africa Group • Accra • Nairobi • Lagos • Johannesburg',
+            header_custom_fields=header_custom_fields or [],
+            line_custom_fields=line_custom_fields or [],
+            custom_field_definitions=header_custom_fields or [],
+            is_default=is_default,
+            is_active=is_active
+        )
+
+        if client and is_default:
+            client.default_template = tmpl
+            client.save(update_fields=['default_template'])
+
+        CacheManager.invalidate_receivables()
+        return tmpl
+
+    @staticmethod
+    @transaction.atomic
+    def invoice_template_update(*, template_id, **fields) -> ClientInvoiceTemplate:
+        tmpl = ClientInvoiceTemplate.objects.select_for_update().get(id=template_id)
+        if fields.get('is_default'):
+            ClientInvoiceTemplate.objects.filter(client=tmpl.client, is_default=True).exclude(id=template_id).update(is_default=False)
+
+        for k, v in fields.items():
+            if hasattr(tmpl, k) and v is not None:
+                setattr(tmpl, k, v)
+        if 'header_custom_fields' in fields:
+            tmpl.custom_field_definitions = fields['header_custom_fields']
+        tmpl.save()
+
+        if tmpl.client and tmpl.is_default:
+            tmpl.client.default_template = tmpl
+            tmpl.client.save(update_fields=['default_template'])
+
+        CacheManager.invalidate_receivables()
+        return tmpl
+
+    @staticmethod
+    @transaction.atomic
+    def invoice_template_delete(*, template_id) -> None:
+        tmpl = ClientInvoiceTemplate.objects.get(id=template_id)
+        ClientInvoice.objects.filter(template=tmpl).update(template=None)
+        Client.objects.filter(default_template=tmpl).update(default_template=None)
+        tmpl.delete()
+        CacheManager.invalidate_receivables()
+
+    @staticmethod
+    @transaction.atomic
+    def invoice_template_apply_preset(*, preset_code: str, client_id = None,
+                                      template_name: str = None, is_default: bool = False) -> ClientInvoiceTemplate:
+        from .presets import get_preset_by_code
+        preset = get_preset_by_code(preset_code)
+        if not preset:
+            raise ValidationError(f"Unknown invoice preset code: '{preset_code}'.")
+
+        name = template_name or preset['template_name']
+        return ReceivablesService.invoice_template_create(
+            template_name=name,
+            preset_code=preset['preset_code'],
+            client_id=client_id,
+            layout_style=preset['layout_style'],
+            primary_color=preset['primary_color'],
+            secondary_color=preset['secondary_color'],
+            accent_color=preset['accent_color'],
+            font_family=preset['font_family'],
+            invoice_title=preset['invoice_title'],
+            show_logo=preset['show_logo'],
+            show_tax_breakdown=preset['show_tax_breakdown'],
+            show_bank_details=preset['show_bank_details'],
+            show_due_date_badge=preset['show_due_date_badge'],
+            show_discount=preset['show_discount'],
+            show_unit_of_measure=preset['show_unit_of_measure'],
+            default_notes=preset['default_notes'],
+            default_terms=preset['default_terms'],
+            footer_text=preset['footer_text'],
+            header_custom_fields=preset['header_custom_fields'],
+            line_custom_fields=preset['line_custom_fields'],
+            is_default=is_default,
+            is_active=True
+        )
 
     @staticmethod
     def _post_invoice_gl(inv: ClientInvoice, user=None):
@@ -212,7 +364,8 @@ class ReceivablesService:
     @transaction.atomic
     def invoice_update(*, invoice_id, issue_date=None, due_date=None,
                        total_amount: Decimal = None, amount_paid: Decimal = None,
-                       status: str = None) -> ClientInvoice:
+                       status: str = None, template_id = None, custom_fields: dict = None,
+                       notes: str = None, terms_and_conditions: str = None) -> ClientInvoice:
         inv = ClientInvoice.objects.select_for_update().get(id=invoice_id)
         if issue_date is not None:
             inv.issue_date = issue_date
@@ -228,6 +381,16 @@ class ReceivablesService:
                 inv.status = ClientInvoiceStatus.PARTIALLY_PAID
         if status is not None:
             inv.status = status
+        if template_id is not None:
+            inv.template = ClientInvoiceTemplate.objects.filter(id=template_id).first()
+        if custom_fields is not None:
+            current = dict(inv.custom_fields or {})
+            current.update(custom_fields)
+            inv.custom_fields = current
+        if notes is not None:
+            inv.notes = notes
+        if terms_and_conditions is not None:
+            inv.terms_and_conditions = terms_and_conditions
         inv.save()
         CacheManager.invalidate_receivables()
         return inv

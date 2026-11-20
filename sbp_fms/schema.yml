@@ -6448,6 +6448,436 @@ paths:
                 - success
                 - message
           description: ''
+  /api/v1/receivables/admin/invoice-templates/:
+    get:
+      operationId: admin_receivables_invoice_template_list
+      description: Returns all invoice templates with header/line custom field definitions,
+        colors, and layout styles. Filterable by client_id.
+      summary: List invoice design templates and custom field configurations
+      parameters:
+      - in: query
+        name: client_id
+        schema:
+          type: string
+        description: Filter templates for a specific client entity (also includes
+          global defaults)
+      tags:
+      - Receivables - Invoice Builder
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ClientInvoiceTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: admin_receivables_invoice_template_create
+      description: Creates a custom invoice builder configuration with dynamic header
+        custom fields, line custom fields, styling, and compliance toggles.
+      summary: Create new custom invoice template / layout
+      tags:
+      - Receivables - Invoice Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientInvoiceTemplateCreateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClientInvoiceTemplateCreateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClientInvoiceTemplateCreateInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ClientInvoiceTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/receivables/admin/invoice-templates/{template_id}/:
+    get:
+      operationId: admin_receivables_invoice_template_detail
+      summary: Retrieve invoice template configuration
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Receivables - Invoice Builder
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ClientInvoiceTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    put:
+      operationId: admin_receivables_invoice_template_update
+      summary: Update invoice template configuration
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Receivables - Invoice Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientInvoiceTemplateUpdateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClientInvoiceTemplateUpdateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClientInvoiceTemplateUpdateInputRequest'
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ClientInvoiceTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: admin_receivables_invoice_template_partial_update
+      summary: Partially update invoice template configuration
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Receivables - Invoice Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedClientInvoiceTemplateUpdateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedClientInvoiceTemplateUpdateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedClientInvoiceTemplateUpdateInputRequest'
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ClientInvoiceTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    delete:
+      operationId: admin_receivables_invoice_template_delete
+      summary: Delete invoice template
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Receivables - Invoice Builder
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/receivables/admin/invoice-templates/presets/:
+    get:
+      operationId: admin_receivables_invoice_template_presets_list
+      description: Returns pre-configured templates for Outsourced Workforce Staffing,
+        Standard Corporate, Executive Recruitment, and Management Consulting.
+      summary: List pre-built industry invoice presets
+      tags:
+      - Receivables - Invoice Builder
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+    post:
+      operationId: admin_receivables_invoice_template_preset_apply
+      description: Creates a new template directly from an industry preset code (e.g.
+        STAFFING_WORKFORCE, STANDARD_CORPORATE, RECRUITMENT_PLACEMENTS, CONSULTING_MANAGEMENT).
+      summary: Apply a pre-built industry preset to a client or as global default
+      tags:
+      - Receivables - Invoice Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyPresetInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ApplyPresetInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ApplyPresetInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ClientInvoiceTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/receivables/admin/invoice-templates/preview/:
+    post:
+      operationId: admin_receivables_invoice_builder_preview
+      description: Renders a live styled preview packet for the frontend given any
+        template configuration and optional sample invoice data.
+      summary: Real-time interactive invoice builder preview
+      tags:
+      - Receivables - Invoice Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceBuilderPreviewInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceBuilderPreviewInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceBuilderPreviewInputRequest'
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ClientInvoiceRenderOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/v1/receivables/admin/invoices/:
     get:
       operationId: admin_receivables_invoice_list
@@ -6804,6 +7234,52 @@ paths:
                 additionalProperties: {}
           description: ''
         '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/receivables/admin/invoices/{invoice_id}/render/:
+    get:
+      operationId: admin_receivables_invoice_render
+      description: Fetches the full structured invoice packet formatted according
+        to the client template, with custom header fields, custom line columns, company
+        legal details, bank remittance accounts, and tax breakdowns.
+      summary: Retrieve complete rendered invoice packet with template styling and
+        custom fields
+      parameters:
+      - in: path
+        name: invoice_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Receivables - Invoices Admin
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ClientInvoiceRenderOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '404':
           content:
             application/json:
               schema:
@@ -10993,6 +11469,25 @@ components:
       - overdue_61_90_days
       - overdue_90_plus_days
       - total_receivables
+    ApplyPresetInputRequest:
+      type: object
+      properties:
+        preset_code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        client_id:
+          type: string
+          format: uuid
+          nullable: true
+        template_name:
+          type: string
+          maxLength: 100
+        is_default:
+          type: boolean
+          default: false
+      required:
+      - preset_code
     AssetCategoryCreateInputRequest:
       type: object
       properties:
@@ -12738,6 +13233,10 @@ components:
         client_id:
           type: string
           format: uuid
+        template_id:
+          type: string
+          format: uuid
+          nullable: true
         issue_date:
           type: string
           format: date
@@ -12749,6 +13248,13 @@ components:
           format: decimal
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
           nullable: true
+        notes:
+          type: string
+        terms_and_conditions:
+          type: string
+        custom_fields:
+          type: object
+          additionalProperties: {}
         lines:
           type: array
           items:
@@ -12794,6 +13300,9 @@ components:
           format: decimal
           pattern: ^-?\d{0,1}(?:\.\d{0,4})?$
           default: '0.0000'
+        custom_fields:
+          type: object
+          additionalProperties: {}
       required:
       - description
       - unit_price
@@ -12845,6 +13354,9 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        custom_fields:
+          description: Line-level custom field values (e.g. employee_name, timesheet_code,
+            department)
         invoice:
           type: string
           format: uuid
@@ -12869,6 +13381,9 @@ components:
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
           readOnly: true
         client_name:
+          type: string
+          readOnly: true
+        template_name:
           type: string
           readOnly: true
         lines:
@@ -12915,9 +13430,20 @@ components:
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
         status:
           $ref: '#/components/schemas/ClientInvoiceStatusEnum'
+        notes:
+          type: string
+        terms_and_conditions:
+          type: string
+        custom_fields:
+          description: Custom client-specific key-value values (e.g. po_number, cost_center,
+            site_location)
         client:
           type: string
           format: uuid
+        template:
+          type: string
+          format: uuid
+          nullable: true
         created_by:
           type: string
           format: uuid
@@ -12940,8 +13466,45 @@ components:
       - invoice_number
       - issue_date
       - lines
+      - template_name
       - total_amount
       - updated_at
+    ClientInvoiceRenderOutput:
+      type: object
+      properties:
+        invoice:
+          type: object
+          additionalProperties: {}
+        client:
+          type: object
+          additionalProperties: {}
+        company:
+          type: object
+          additionalProperties: {}
+        bank_accounts:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        template:
+          type: object
+          additionalProperties: {}
+        totals:
+          type: object
+          additionalProperties: {}
+        lines:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - bank_accounts
+      - client
+      - company
+      - invoice
+      - lines
+      - template
+      - totals
     ClientInvoiceStatusEnum:
       enum:
       - DRAFT
@@ -12964,6 +13527,233 @@ components:
         * `OVERDUE` - Overdue
         * `CANCELLED` - Cancelled
         * `VOIDED` - Voided
+    ClientInvoiceTemplateCreateInputRequest:
+      type: object
+      properties:
+        template_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        client_id:
+          type: string
+          format: uuid
+          nullable: true
+        layout_style:
+          allOf:
+          - $ref: '#/components/schemas/LayoutStyleEnum'
+          default: MODERN
+        primary_color:
+          type: string
+          minLength: 1
+          default: '#102a43'
+          maxLength: 20
+        secondary_color:
+          type: string
+          minLength: 1
+          default: '#243b53'
+          maxLength: 20
+        accent_color:
+          type: string
+          minLength: 1
+          default: '#0ea5e9'
+          maxLength: 20
+        logo_url:
+          type: string
+          default: ''
+          maxLength: 500
+        show_logo:
+          type: boolean
+          default: true
+        font_family:
+          type: string
+          minLength: 1
+          default: Inter, sans-serif
+          maxLength: 100
+        invoice_title:
+          type: string
+          minLength: 1
+          default: TAX INVOICE
+          maxLength: 100
+        show_tax_breakdown:
+          type: boolean
+          default: true
+        show_bank_details:
+          type: boolean
+          default: true
+        show_due_date_badge:
+          type: boolean
+          default: true
+        default_notes:
+          type: string
+          default: Thank you for partnering with SBP Africa Group.
+        default_terms:
+          type: string
+          default: Payment is due within payment terms. All bank charges borne by
+            payer.
+        footer_text:
+          type: string
+          default: SBP Africa Group • Accra • Nairobi • Lagos • Johannesburg
+          maxLength: 255
+        custom_field_definitions:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: 'Custom field definitions: list of dicts with key, label, type,
+            required, default_value, placeholder'
+        is_default:
+          type: boolean
+          default: false
+        is_active:
+          type: boolean
+          default: true
+      required:
+      - template_name
+    ClientInvoiceTemplateOutput:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        client_name:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        template_name:
+          type: string
+          maxLength: 100
+        preset_code:
+          type: string
+          maxLength: 50
+        layout_style:
+          $ref: '#/components/schemas/LayoutStyleEnum'
+        primary_color:
+          type: string
+          maxLength: 20
+        secondary_color:
+          type: string
+          maxLength: 20
+        accent_color:
+          type: string
+          maxLength: 20
+        logo_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
+        show_logo:
+          type: boolean
+        font_family:
+          type: string
+          maxLength: 100
+        invoice_title:
+          type: string
+          maxLength: 100
+        show_tax_breakdown:
+          type: boolean
+        show_bank_details:
+          type: boolean
+        show_due_date_badge:
+          type: boolean
+        show_discount:
+          type: boolean
+        show_unit_of_measure:
+          type: boolean
+        default_notes:
+          type: string
+        default_terms:
+          type: string
+        footer_text:
+          type: string
+          maxLength: 255
+        header_custom_fields:
+          description: 'Header-level custom fields: list of dicts with key, label,
+            type, required, default_value, placeholder, options'
+        line_custom_fields:
+          description: 'Table line-item custom columns: list of dicts with key, label,
+            type, required, default_value, placeholder, options'
+        custom_field_definitions:
+          description: Legacy alias for header_custom_fields
+        is_default:
+          type: boolean
+        is_active:
+          type: boolean
+        client:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - client_name
+      - created_at
+      - id
+      - template_name
+      - updated_at
+    ClientInvoiceTemplateUpdateInputRequest:
+      type: object
+      properties:
+        template_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        layout_style:
+          $ref: '#/components/schemas/LayoutStyleEnum'
+        primary_color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        secondary_color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        accent_color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        logo_url:
+          type: string
+          maxLength: 500
+        show_logo:
+          type: boolean
+        font_family:
+          type: string
+          minLength: 1
+          maxLength: 100
+        invoice_title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        show_tax_breakdown:
+          type: boolean
+        show_bank_details:
+          type: boolean
+        show_due_date_badge:
+          type: boolean
+        default_notes:
+          type: string
+        default_terms:
+          type: string
+        footer_text:
+          type: string
+          maxLength: 255
+        custom_field_definitions:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        is_default:
+          type: boolean
+        is_active:
+          type: boolean
     ClientInvoiceUpdateInputRequest:
       type: object
       properties:
@@ -12973,6 +13763,10 @@ components:
         due_date:
           type: string
           format: date
+        template_id:
+          type: string
+          format: uuid
+          nullable: true
         total_amount:
           type: string
           format: decimal
@@ -12985,6 +13779,13 @@ components:
           type: string
           minLength: 1
           maxLength: 20
+        notes:
+          type: string
+        terms_and_conditions:
+          type: string
+        custom_fields:
+          type: object
+          additionalProperties: {}
     ClientOutput:
       type: object
       properties:
@@ -13048,6 +13849,10 @@ components:
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
         is_active:
           type: boolean
+        default_template:
+          type: string
+          format: uuid
+          nullable: true
       required:
       - code
       - created_at
@@ -14659,6 +15464,18 @@ components:
       - vat_amount
       - vat_base
       - vat_rate
+    InvoiceBuilderPreviewInputRequest:
+      type: object
+      properties:
+        template:
+          $ref: '#/components/schemas/ClientInvoiceTemplateCreateInputRequest'
+        template_id:
+          type: string
+          format: uuid
+          nullable: true
+        sample_invoice:
+          type: object
+          additionalProperties: {}
     InvoiceLineInputRequest:
       type: object
       properties:
@@ -14956,6 +15773,20 @@ components:
       - account_code
       - account_name
       - id
+    LayoutStyleEnum:
+      enum:
+      - MODERN
+      - CLASSIC
+      - CORPORATE
+      - MINIMAL
+      - DETAILED_STAFFING
+      type: string
+      description: |-
+        * `MODERN` - Modern Clean
+        * `CLASSIC` - Classic Standard
+        * `CORPORATE` - Corporate Professional
+        * `MINIMAL` - Minimalist
+        * `DETAILED_STAFFING` - Detailed Staffing & Timesheet
     LiveExchangeRateOutput:
       type: object
       properties:
@@ -16438,6 +17269,62 @@ components:
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
         is_reconciled:
           type: boolean
+    PatchedClientInvoiceTemplateUpdateInputRequest:
+      type: object
+      properties:
+        template_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        layout_style:
+          $ref: '#/components/schemas/LayoutStyleEnum'
+        primary_color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        secondary_color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        accent_color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        logo_url:
+          type: string
+          maxLength: 500
+        show_logo:
+          type: boolean
+        font_family:
+          type: string
+          minLength: 1
+          maxLength: 100
+        invoice_title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        show_tax_breakdown:
+          type: boolean
+        show_bank_details:
+          type: boolean
+        show_due_date_badge:
+          type: boolean
+        default_notes:
+          type: string
+        default_terms:
+          type: string
+        footer_text:
+          type: string
+          maxLength: 255
+        custom_field_definitions:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        is_default:
+          type: boolean
+        is_active:
+          type: boolean
     PatchedClientInvoiceUpdateInputRequest:
       type: object
       properties:
@@ -16447,6 +17334,10 @@ components:
         due_date:
           type: string
           format: date
+        template_id:
+          type: string
+          format: uuid
+          nullable: true
         total_amount:
           type: string
           format: decimal
@@ -16459,6 +17350,13 @@ components:
           type: string
           minLength: 1
           maxLength: 20
+        notes:
+          type: string
+        terms_and_conditions:
+          type: string
+        custom_fields:
+          type: object
+          additionalProperties: {}
     PatchedClientUpdateInputRequest:
       type: object
       properties:

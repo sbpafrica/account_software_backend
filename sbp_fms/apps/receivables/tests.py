@@ -342,4 +342,146 @@ class TestReceivablesPaystackPayment:
         assert res_dup.status_code == status.HTTP_200_OK
         assert res_dup.data["data"]["status"] == "ignored"
 
+    def test_invoice_builder_and_custom_fields_lifecycle(self, api_client, superuser):
+        api_client.force_authenticate(user=superuser)
+
+        client = Client.objects.create(
+            name="Ashanti Gold Mining Consortium",
+            code="CL-AGMC-01",
+            country_code="GH",
+            tax_id="TIN-AGMC-8910"
+        )
+
+        # 1. Fetch industry invoice presets
+        presets_url = reverse("invoice-template-presets-admin")
+        res_presets = api_client.get(presets_url)
+        assert res_presets.status_code == status.HTTP_200_OK
+        presets_data = res_presets.data["data"]
+        assert len(presets_data) == 4
+        preset_codes = [p["preset_code"] for p in presets_data]
+        assert "STAFFING_WORKFORCE" in preset_codes
+        assert "STANDARD_CORPORATE" in preset_codes
+        assert "RECRUITMENT_PLACEMENTS" in preset_codes
+        assert "CONSULTING_MANAGEMENT" in preset_codes
+
+        # 2. Apply "STAFFING_WORKFORCE" preset to client as default
+        apply_url = reverse("invoice-template-presets-admin")  # POST /presets/apply/ Wait, check URL name
+        # Let's check the url name in urls.py: name='invoice-template-presets-admin' for presets
+        # In urls.py: path('admin/invoice-templates/presets/', InvoiceTemplatePresetsAdminApi.as_view(), name='invoice-template-presets-admin')
+        res_apply = api_client.post(presets_url, {
+            "preset_code": "STAFFING_WORKFORCE",
+            "client_id": str(client.id),
+            "template_name": "Ashanti Gold Mining Timesheet Layout",
+            "is_default": True
+        }, format="json")
+        assert res_apply.status_code == status.HTTP_201_CREATED
+        tmpl_data = res_apply.data["data"]
+        template_id = tmpl_data["id"]
+        assert tmpl_data["layout_style"] == "DETAILED_STAFFING"
+        assert len(tmpl_data["header_custom_fields"]) >= 3
+        assert len(tmpl_data["line_custom_fields"]) >= 3
+
+        client.refresh_from_db()
+        assert str(client.default_template.id) == template_id
+
+        # 3. Test Real-time Invoice Builder Preview API
+        preview_url = reverse("invoice-builder-preview-admin")
+        res_prev = api_client.post(preview_url, {
+            "template_id": template_id,
+            "sample_invoice": {
+                "custom_fields": {
+                    "po_number": "PO-AGMC-2026-9921",
+                    "service_period": "October 2026",
+                    "site_location": "Tarkwa Mine Site A"
+                }
+            }
+        }, format="json")
+        assert res_prev.status_code == status.HTTP_200_OK
+        prev_data = res_prev.data["data"]
+        assert "invoice" in prev_data
+        assert "client" in prev_data
+        assert "company" in prev_data
+        assert "template" in prev_data
+        assert "totals" in prev_data
+        assert len(prev_data["invoice"]["header_custom_fields"]) >= 3
+
+        # 4. Create Invoice with Custom Header Fields & Custom Line Columns
+        inv_url = reverse("client-invoice-list-admin")
+        inv_payload = {
+            "invoice_number": f"INV-AGMC-{client.id.hex[:6]}",
+            "client_id": str(client.id),
+            "template_id": template_id,
+            "issue_date": "2026-10-31",
+            "due_date": "2026-11-30",
+            "custom_fields": {
+                "po_number": "PO-AGMC-2026-0042",
+                "service_period": "October 2026",
+                "site_location": "Tarkwa Concession Site B",
+                "timesheet_approver": "Ing. Kwame Antwi (Mine Manager)"
+            },
+            "lines": [
+                {
+                    "description": "Heavy Machinery Operation & Excavation Services",
+                    "quantity": 26.0,
+                    "unit_of_measurement": "Days",
+                    "unit_price": 500.0,
+                    "discount": 0.0,
+                    "tax_code": "VAT-15",
+                    "tax_rate": 0.15,
+                    "custom_fields": {
+                        "staff_name": "Kofi Mensah (ID: SBP-084)",
+                        "role_designation": "Excavator Operator",
+                        "days_worked": 26,
+                        "department": "Extraction Pit 2"
+                    }
+                },
+                {
+                    "description": "Articulated Dump Truck Driver Workforce",
+                    "quantity": 26.0,
+                    "unit_of_measurement": "Days",
+                    "unit_price": 400.0,
+                    "discount": 0.0,
+                    "tax_code": "VAT-15",
+                    "tax_rate": 0.15,
+                    "custom_fields": {
+                        "staff_name": "Yaw Boateng (ID: SBP-085)",
+                        "role_designation": "Dump Truck Driver",
+                        "days_worked": 26,
+                        "department": "Haulage Fleet"
+                    }
+                }
+            ]
+        }
+        res_inv = api_client.post(inv_url, inv_payload, format="json")
+        assert res_inv.status_code == status.HTTP_201_CREATED
+        created_inv = res_inv.data["data"]
+        inv_id = created_inv["id"]
+        assert created_inv["custom_fields"]["po_number"] == "PO-AGMC-2026-0042"
+        assert len(created_inv["lines"]) == 2
+        assert created_inv["lines"][0]["custom_fields"]["staff_name"] == "Kofi Mensah (ID: SBP-084)"
+
+        # 5. Test Required Field Validation
+        bad_payload = {
+            "invoice_number": f"INV-BAD-{client.id.hex[:6]}",
+            "client_id": str(client.id),
+            "template_id": template_id,
+            "issue_date": "2026-10-31",
+            "due_date": "2026-11-30",
+            "custom_fields": {}  # Missing required po_number and service_period
+        }
+        res_bad = api_client.post(inv_url, bad_payload, format="json")
+        assert res_bad.status_code == status.HTTP_400_BAD_REQUEST
+
+        # 6. Test Full Rendered Invoice Data API
+        render_url = reverse("client-invoice-render-admin", kwargs={"invoice_id": inv_id})
+        res_render = api_client.get(render_url)
+        assert res_render.status_code == status.HTTP_200_OK
+        render_data = res_render.data["data"]
+        assert render_data["template"]["layout_style"] == "DETAILED_STAFFING"
+        assert render_data["client"]["name"] == "Ashanti Gold Mining Consortium"
+        assert any(f["key"] == "po_number" and f["value"] == "PO-AGMC-2026-0042" for f in render_data["invoice"]["header_custom_fields"])
+        assert len(render_data["lines"]) == 2
+        assert render_data["lines"][0]["custom_fields"]["staff_name"] == "Kofi Mensah (ID: SBP-084)"
+
+
 

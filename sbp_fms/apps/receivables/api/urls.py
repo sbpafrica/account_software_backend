@@ -6,7 +6,10 @@ from apps.receivables.api.admin import (
     ClientInvoiceIssueAdminApi,
     PaymentReceiptListAdminApi, PaymentReceiptDetailAdminApi,
     CustomerStatementAdminApi,
-    AgingReportAdminApi
+    AgingReportAdminApi,
+    ClientInvoiceTemplateListAdminApi, ClientInvoiceTemplateDetailAdminApi,
+    InvoiceTemplatePresetsAdminApi, InvoiceBuilderPreviewAdminApi,
+    ClientInvoiceRenderAdminApi
 )
 
 from apps.receivables.api.paystack_views import (
@@ -31,6 +34,13 @@ urlpatterns = [
     path('admin/invoices/', ClientInvoiceListAdminApi.as_view(), name='client-invoice-list-admin'),
     path('admin/invoices/<uuid:invoice_id>/', ClientInvoiceDetailAdminApi.as_view(), name='client-invoice-detail-admin'),
     path('admin/invoices/<uuid:invoice_id>/issue/', ClientInvoiceIssueAdminApi.as_view(), name='client-invoice-issue-admin'),
+    path('admin/invoices/<uuid:invoice_id>/render/', ClientInvoiceRenderAdminApi.as_view(), name='client-invoice-render-admin'),
+
+    # Admin / Invoice Builder & Field Presets
+    path('admin/invoice-templates/', ClientInvoiceTemplateListAdminApi.as_view(), name='invoice-template-list-admin'),
+    path('admin/invoice-templates/<uuid:template_id>/', ClientInvoiceTemplateDetailAdminApi.as_view(), name='invoice-template-detail-admin'),
+    path('admin/invoice-templates/presets/', InvoiceTemplatePresetsAdminApi.as_view(), name='invoice-template-presets-admin'),
+    path('admin/invoice-templates/preview/', InvoiceBuilderPreviewAdminApi.as_view(), name='invoice-builder-preview-admin'),
 
     # Admin / Payment Receipts
     path('admin/receipts/', PaymentReceiptListAdminApi.as_view(), name='payment-receipt-list-admin'),

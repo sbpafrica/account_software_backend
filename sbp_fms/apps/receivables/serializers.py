@@ -1,5 +1,74 @@
 from rest_framework import serializers
-from .models import Client, ClientInvoice, ClientInvoiceLine, PaymentReceipt, ReceiptAllocation
+from .models import (
+    Client, ClientInvoice, ClientInvoiceLine, PaymentReceipt, ReceiptAllocation,
+    ClientInvoiceTemplate, InvoiceLayoutStyle
+)
+
+
+# ==============================================================================
+# INVOICE TEMPLATE & BUILDER SERIALIZERS
+# ==============================================================================
+
+class ClientInvoiceTemplateOutputSerializer(serializers.ModelSerializer):
+    client_name = serializers.CharField(source='client.name', read_only=True)
+
+    class Meta:
+        model = ClientInvoiceTemplate
+        fields = '__all__'
+
+
+class ClientInvoiceTemplateCreateInputSerializer(serializers.Serializer):
+    template_name = serializers.CharField(max_length=100)
+    client_id = serializers.UUIDField(required=False, allow_null=True)
+    layout_style = serializers.ChoiceField(choices=InvoiceLayoutStyle.choices, default=InvoiceLayoutStyle.MODERN)
+    primary_color = serializers.CharField(max_length=20, default='#102a43')
+    secondary_color = serializers.CharField(max_length=20, default='#243b53')
+    accent_color = serializers.CharField(max_length=20, default='#0ea5e9')
+    logo_url = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
+    show_logo = serializers.BooleanField(default=True)
+    font_family = serializers.CharField(max_length=100, default='Inter, sans-serif')
+    invoice_title = serializers.CharField(max_length=100, default='TAX INVOICE')
+    show_tax_breakdown = serializers.BooleanField(default=True)
+    show_bank_details = serializers.BooleanField(default=True)
+    show_due_date_badge = serializers.BooleanField(default=True)
+    default_notes = serializers.CharField(required=False, allow_blank=True, default='Thank you for partnering with SBP Africa Group.')
+    default_terms = serializers.CharField(required=False, allow_blank=True, default='Payment is due within payment terms. All bank charges borne by payer.')
+    footer_text = serializers.CharField(max_length=255, required=False, allow_blank=True, default='SBP Africa Group • Accra • Nairobi • Lagos • Johannesburg')
+    custom_field_definitions = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        default=list,
+        help_text="Custom field definitions: list of dicts with key, label, type, required, default_value, placeholder"
+    )
+    is_default = serializers.BooleanField(default=False)
+    is_active = serializers.BooleanField(default=True)
+
+
+class ClientInvoiceTemplateUpdateInputSerializer(serializers.Serializer):
+    template_name = serializers.CharField(max_length=100, required=False)
+    layout_style = serializers.ChoiceField(choices=InvoiceLayoutStyle.choices, required=False)
+    primary_color = serializers.CharField(max_length=20, required=False)
+    secondary_color = serializers.CharField(max_length=20, required=False)
+    accent_color = serializers.CharField(max_length=20, required=False)
+    logo_url = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    show_logo = serializers.BooleanField(required=False)
+    font_family = serializers.CharField(max_length=100, required=False)
+    invoice_title = serializers.CharField(max_length=100, required=False)
+    show_tax_breakdown = serializers.BooleanField(required=False)
+    show_bank_details = serializers.BooleanField(required=False)
+    show_due_date_badge = serializers.BooleanField(required=False)
+    default_notes = serializers.CharField(required=False, allow_blank=True)
+    default_terms = serializers.CharField(required=False, allow_blank=True)
+    footer_text = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    custom_field_definitions = serializers.ListField(child=serializers.DictField(), required=False)
+    is_default = serializers.BooleanField(required=False)
+    is_active = serializers.BooleanField(required=False)
+
+
+class InvoiceBuilderPreviewInputSerializer(serializers.Serializer):
+    template = ClientInvoiceTemplateCreateInputSerializer(required=False)
+    template_id = serializers.UUIDField(required=False, allow_null=True)
+    sample_invoice = serializers.DictField(required=False, default=dict)
 
 
 class ClientOutputSerializer(serializers.ModelSerializer):
@@ -51,11 +120,13 @@ class ClientInvoiceLineInputSerializer(serializers.Serializer):
     discount = serializers.DecimalField(max_digits=18, decimal_places=4, required=False, default=0.0)
     tax_code = serializers.CharField(max_length=20, required=False, default='EXEMPT')
     tax_rate = serializers.DecimalField(max_digits=5, decimal_places=4, required=False, default=0.0)
+    custom_fields = serializers.DictField(required=False, default=dict)
 
 
 class ClientInvoiceOutputSerializer(serializers.ModelSerializer):
     balance_due = serializers.DecimalField(max_digits=18, decimal_places=4, read_only=True)
     client_name = serializers.CharField(source='client.name', read_only=True)
+    template_name = serializers.CharField(source='template.template_name', read_only=True, default=None)
     lines = ClientInvoiceLineOutputSerializer(many=True, read_only=True)
 
     class Meta:
@@ -66,18 +137,43 @@ class ClientInvoiceOutputSerializer(serializers.ModelSerializer):
 class ClientInvoiceCreateInputSerializer(serializers.Serializer):
     invoice_number = serializers.CharField(max_length=50)
     client_id = serializers.UUIDField()
+    template_id = serializers.UUIDField(required=False, allow_null=True)
     issue_date = serializers.DateField()
     due_date = serializers.DateField()
     total_amount = serializers.DecimalField(max_digits=18, decimal_places=4, required=False, allow_null=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    terms_and_conditions = serializers.CharField(required=False, allow_blank=True)
+    custom_fields = serializers.DictField(required=False, default=dict)
     lines = ClientInvoiceLineInputSerializer(many=True, required=False, default=list)
 
 
 class ClientInvoiceUpdateInputSerializer(serializers.Serializer):
     issue_date = serializers.DateField(required=False)
     due_date = serializers.DateField(required=False)
+    template_id = serializers.UUIDField(required=False, allow_null=True)
     total_amount = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
     amount_paid = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
     status = serializers.CharField(max_length=20, required=False)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    terms_and_conditions = serializers.CharField(required=False, allow_blank=True)
+    custom_fields = serializers.DictField(required=False)
+
+
+class ApplyPresetInputSerializer(serializers.Serializer):
+    preset_code = serializers.CharField(max_length=50)
+    client_id = serializers.UUIDField(required=False, allow_null=True)
+    template_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    is_default = serializers.BooleanField(default=False)
+
+
+class ClientInvoiceRenderOutputSerializer(serializers.Serializer):
+    invoice = serializers.DictField()
+    client = serializers.DictField()
+    company = serializers.DictField()
+    bank_accounts = serializers.ListField(child=serializers.DictField())
+    template = serializers.DictField()
+    totals = serializers.DictField()
+    lines = serializers.ListField(child=serializers.DictField())
 
 
 class AgingReportOutputSerializer(serializers.Serializer):
