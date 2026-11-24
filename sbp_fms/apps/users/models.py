@@ -97,6 +97,10 @@ SUPERADMIN_PERMISSIONS = {
     'roles:assign_permissions',
     'roles:all',
     'organizations:all',
+    'organizations:read',
+    'organizations:write',
+    'organizations:list',
+    'organizations:manage',
     'plans:write',
     'plans:delete',
     'plans:manage',
@@ -128,8 +132,8 @@ ALL_TENANT_BUSINESS_PERMISSIONS = [
     'tax:read', 'tax:write',
     # Financial Statements & Operational Reports
     'reports:all', 'reports:read',
-    # Organization Settings & Members
-    'organizations:read', 'organizations:write',
+    # Tenant Organization Settings & Workspace Members
+    'organization:settings', 'organization:profile',
     'members:read', 'members:write',
     # Tenant Staff & User Directory Management
     'users:read', 'users:write', 'users:manage', 'users:assign_role',

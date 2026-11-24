@@ -116,6 +116,17 @@ class Command(BaseCommand):
 
                 self.stdout.write("==> [14/14] Seeding Client Service Contracts...")
                 self._seed_contracts()
+
+                # Adopt any unassigned / orphaned legacy demo records into primary corporate organization
+                primary_org = orgs_map['primary']
+                FixedAsset.all_objects.filter(organization__isnull=True).update(organization=primary_org)
+                DepreciationRun.all_objects.filter(organization__isnull=True).update(organization=primary_org)
+                BankAccount.all_objects.filter(organization__isnull=True).update(organization=primary_org)
+                Client.all_objects.filter(organization__isnull=True).update(organization=primary_org)
+                Supplier.all_objects.filter(organization__isnull=True).update(organization=primary_org)
+                PayrollBatch.all_objects.filter(organization__isnull=True).update(organization=primary_org)
+                Budget.all_objects.filter(organization__isnull=True).update(organization=primary_org)
+                Contract.all_objects.filter(organization__isnull=True).update(organization=primary_org)
             finally:
                 clear_current_organization()
 
