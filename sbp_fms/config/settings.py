@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     # SBP-FMS Domain Apps
     'apps.ledger.apps.LedgerConfig',
     'apps.receivables.apps.ReceivablesConfig',
+    'apps.invoicing.apps.InvoicingConfig',
     'apps.payables.apps.PayablesConfig',
     'apps.payroll_escrow.apps.PayrollEscrowConfig',
     'apps.treasury.apps.TreasuryConfig',

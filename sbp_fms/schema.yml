@@ -1436,6 +1436,1288 @@ paths:
                 - success
                 - message
           description: ''
+  /api/v1/invoicing/categories/:
+    get:
+      operationId: admin_invoicing_category_list
+      description: Returns dynamic, admin-configurable business categories (e.g. Workforce
+        Outsourcing, Payroll Administration).
+      summary: List invoice categories
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+        description: Filter by active status
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search by name or code
+      tags:
+      - Invoicing - Categories
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedInvoiceCategoryList'
+          description: ''
+    post:
+      operationId: admin_invoicing_category_create
+      description: Allows admins to create new business vertical categories on the
+        fly.
+      summary: Create new invoice category
+      tags:
+      - Invoicing - Categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceCategoryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceCategoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceCategoryRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceCategory'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/categories/{category_id}/:
+    get:
+      operationId: admin_invoicing_category_detail
+      summary: Retrieve invoice category detail
+      parameters:
+      - in: path
+        name: category_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Categories
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceCategory'
+                required:
+                - success
+                - message
+          description: ''
+    patch:
+      operationId: admin_invoicing_category_update
+      summary: Update invoice category
+      parameters:
+      - in: path
+        name: category_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceCategoryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceCategoryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceCategoryRequest'
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceCategory'
+                required:
+                - success
+                - message
+          description: ''
+    delete:
+      operationId: admin_invoicing_category_delete
+      summary: Delete invoice category
+      parameters:
+      - in: path
+        name: category_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Categories
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/categories/seed-defaults/:
+    post:
+      operationId: admin_invoicing_category_seed_defaults
+      description: Populates initial default categories (Workforce Outsourcing, Payroll
+        Administration, Recruitment, Management Consulting, Camp Logistics) if missing.
+      summary: Seed default SBP business categories
+      tags:
+      - Invoicing - Categories
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InvoiceCategory'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/invoices/:
+    get:
+      operationId: admin_invoicing_invoice_list
+      summary: List customer commercial & tax invoices
+      parameters:
+      - in: query
+        name: category_id
+        schema:
+          type: string
+        description: Filter by business category ID
+      - in: query
+        name: client_id
+        schema:
+          type: string
+        description: Filter by client ID
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Filter by issue_date <= end_date
+      - in: query
+        name: invoice_type
+        schema:
+          type: string
+        description: Filter by invoice type
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: 'Search invoice #, PO, description, client'
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Filter by issue_date >= start_date
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Filter by invoice status
+      tags:
+      - Invoicing - Invoices
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedInvoiceListList'
+          description: ''
+    post:
+      operationId: admin_invoicing_invoice_create
+      description: Creates a commercial or tax invoice with dynamic custom header
+        fields, custom line columns, and Ghana GRA tax cascading calculations.
+      summary: Create new customer invoice
+      tags:
+      - Invoicing - Invoices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceDetail'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/invoices/{invoice_id}/:
+    get:
+      operationId: admin_invoicing_invoice_detail
+      summary: Retrieve invoice detail
+      parameters:
+      - in: path
+        name: invoice_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Invoices
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceDetail'
+                required:
+                - success
+                - message
+          description: ''
+    patch:
+      operationId: admin_invoicing_invoice_update
+      summary: Update draft invoice metadata
+      parameters:
+      - in: path
+        name: invoice_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Invoices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceDetailRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceDetailRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceDetailRequest'
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceDetail'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/invoices/{invoice_id}/approve/:
+    post:
+      operationId: admin_invoicing_invoice_approve
+      description: Moves invoice status to ISSUED, debits Accounts Receivable (1100-AR-GH),
+        credits Revenue (4010-REVENUE-GH), and credits Indirect Tax Payable (2020-TAX-PAYABLE-GH).
+      summary: Approve and issue invoice (posts to General Ledger)
+      parameters:
+      - in: path
+        name: invoice_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Invoices
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceDetail'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/invoices/{invoice_id}/credit-note/:
+    post:
+      operationId: admin_invoicing_invoice_credit_note
+      description: Creates an adjusting credit note, points parent_invoice to original,
+        and posts reversal journal entry to GL.
+      summary: Issue credit note against invoice
+      parameters:
+      - in: path
+        name: invoice_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Invoices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreditNoteCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreditNoteCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreditNoteCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceDetail'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/invoices/{invoice_id}/render/:
+    get:
+      operationId: admin_invoicing_invoice_render
+      description: Returns complete hierarchical rendering tree including branding
+        styling, header custom fields, line custom columns, bank remittance details,
+        and statutory tax breakdown.
+      summary: Render invoice payload for print/PDF/preview
+      parameters:
+      - in: path
+        name: invoice_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Invoices
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/invoices/{invoice_id}/void/:
+    post:
+      operationId: admin_invoicing_invoice_void
+      description: Voids an issued or draft invoice. If GL journal entries were posted,
+        automatically performs accounting reversal.
+      summary: Void an invoice
+      parameters:
+      - in: path
+        name: invoice_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Invoices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceVoidRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceVoidRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceVoidRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceDetail'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/items/:
+    get:
+      operationId: admin_invoicing_item_list
+      summary: List catalog services and billable items
+      parameters:
+      - in: query
+        name: category_id
+        schema:
+          type: string
+        description: Filter by category ID
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+        description: Filter by active status
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search by code or name
+      tags:
+      - Invoicing - Billable Items
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBillableItemList'
+          description: ''
+    post:
+      operationId: admin_invoicing_item_create
+      summary: Create billable catalog item
+      tags:
+      - Invoicing - Billable Items
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillableItemRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BillableItemRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BillableItemRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/BillableItem'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/items/{item_id}/:
+    get:
+      operationId: admin_invoicing_item_detail
+      summary: Retrieve billable item detail
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Billable Items
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/BillableItem'
+                required:
+                - success
+                - message
+          description: ''
+    patch:
+      operationId: admin_invoicing_item_update
+      summary: Update billable item
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Billable Items
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBillableItemRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBillableItemRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBillableItemRequest'
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/BillableItem'
+                required:
+                - success
+                - message
+          description: ''
+    delete:
+      operationId: admin_invoicing_item_delete
+      summary: Delete billable item
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Billable Items
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/schedules/:
+    get:
+      operationId: admin_invoicing_schedule_list
+      summary: List recurring billing schedules
+      parameters:
+      - in: query
+        name: client_id
+        schema:
+          type: string
+        description: Filter by client ID
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Filter by schedule status (ACTIVE, PAUSED, COMPLETED)
+      tags:
+      - Invoicing - Recurring Schedules
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRecurringScheduleList'
+          description: ''
+    post:
+      operationId: admin_invoicing_schedule_create
+      summary: Create recurring billing schedule
+      tags:
+      - Invoicing - Recurring Schedules
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringScheduleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RecurringScheduleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RecurringScheduleRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/RecurringSchedule'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/schedules/{schedule_id}/:
+    get:
+      operationId: admin_invoicing_schedule_detail
+      summary: Retrieve recurring schedule detail
+      parameters:
+      - in: path
+        name: schedule_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Recurring Schedules
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/RecurringSchedule'
+                required:
+                - success
+                - message
+          description: ''
+    patch:
+      operationId: admin_invoicing_schedule_update
+      summary: Update recurring schedule
+      parameters:
+      - in: path
+        name: schedule_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Recurring Schedules
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRecurringScheduleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRecurringScheduleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRecurringScheduleRequest'
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/RecurringSchedule'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/schedules/run-due/:
+    post:
+      operationId: admin_invoicing_schedule_run_due
+      description: Generates invoices for all active schedules where next_run_date
+        <= today, advances next_run_date.
+      summary: Execute due recurring schedules
+      tags:
+      - Invoicing - Recurring Schedules
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InvoiceList'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/templates/:
+    get:
+      operationId: admin_invoicing_template_list
+      summary: List invoice templates
+      parameters:
+      - in: query
+        name: client_id
+        schema:
+          type: string
+        description: Filter by client ID (or global)
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+        description: Filter by active status
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Invoicing - Templates Builder
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedInvoiceTemplateList'
+          description: ''
+    post:
+      operationId: admin_invoicing_template_create
+      summary: Create invoice template
+      tags:
+      - Invoicing - Templates Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceTemplateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceTemplateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceTemplateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceTemplate'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/templates/{template_id}/:
+    get:
+      operationId: admin_invoicing_template_detail
+      summary: Retrieve invoice template
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Templates Builder
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceTemplate'
+                required:
+                - success
+                - message
+          description: ''
+    patch:
+      operationId: admin_invoicing_template_update
+      summary: Update invoice template
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Templates Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceTemplateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceTemplateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInvoiceTemplateRequest'
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceTemplate'
+                required:
+                - success
+                - message
+          description: ''
+    delete:
+      operationId: admin_invoicing_template_delete
+      summary: Delete invoice template
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Templates Builder
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/templates/apply-preset/:
+    post:
+      operationId: admin_invoicing_template_apply_preset
+      summary: Apply industry preset into a new template
+      tags:
+      - Invoicing - Templates Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyPresetRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ApplyPresetRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ApplyPresetRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/InvoiceTemplate'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/templates/presets/:
+    get:
+      operationId: admin_invoicing_template_presets
+      description: Returns pre-built presets for Staffing & Workforce, Corporate Standard,
+        Recruitment Placements, and Management Consulting.
+      summary: List industry template presets
+      tags:
+      - Invoicing - Templates Builder
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TemplatePreset'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/templates/preview/:
+    post:
+      operationId: admin_invoicing_builder_preview
+      summary: Simulated live invoice builder canvas preview
+      tags:
+      - Invoicing - Templates Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoicingBuilderPreviewInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoicingBuilderPreviewInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoicingBuilderPreviewInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
   /api/v1/ledger/admin/accounts/:
     get:
       operationId: admin_ledger_account_list
@@ -11488,6 +12770,25 @@ components:
           default: false
       required:
       - preset_code
+    ApplyPresetRequest:
+      type: object
+      properties:
+        preset_code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        client_id:
+          type: string
+          format: uuid
+          nullable: true
+        template_name:
+          type: string
+          maxLength: 100
+        make_default:
+          type: boolean
+          default: false
+      required:
+      - preset_code
     AssetCategoryCreateInputRequest:
       type: object
       properties:
@@ -12590,6 +13891,109 @@ components:
           type: string
       required:
       - status
+    BillableItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          maxLength: 50
+        name:
+          type: string
+          maxLength: 255
+        category_name:
+          type: string
+          readOnly: true
+        category_code:
+          type: string
+          readOnly: true
+        description:
+          type: string
+        default_unit:
+          type: string
+          description: e.g. Days, Hours, Month, Headcount, Project
+          maxLength: 50
+        default_unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        default_tax_code:
+          type: string
+          maxLength: 50
+        default_tax_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,4})?$
+        income_account_code:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category_code
+      - category_name
+      - code
+      - created_at
+      - id
+      - income_account_code
+      - name
+      - updated_at
+    BillableItemRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        category_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          nullable: true
+        description:
+          type: string
+        default_unit:
+          type: string
+          minLength: 1
+          description: e.g. Days, Hours, Month, Headcount, Project
+          maxLength: 50
+        default_unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        default_tax_code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        default_tax_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,4})?$
+        income_account_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          nullable: true
+        is_active:
+          type: boolean
+      required:
+      - code
+      - name
     BillingInitializeInputRequest:
       type: object
       description: Input payload to initialize a Paystack subscription checkout for
@@ -14351,6 +15755,20 @@ components:
       - id
       - name
       - updated_at
+    CreditNoteCreateRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+        credit_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+      required:
+      - reason
     CustomerStatementOutput:
       type: object
       properties:
@@ -15213,6 +16631,20 @@ components:
       - purchase_cost
       - purchase_date
       - updated_at
+    FrequencyEnum:
+      enum:
+      - WEEKLY
+      - BI_WEEKLY
+      - MONTHLY
+      - QUARTERLY
+      - ANNUALLY
+      type: string
+      description: |-
+        * `WEEKLY` - Weekly
+        * `BI_WEEKLY` - Bi-Weekly
+        * `MONTHLY` - Monthly
+        * `QUARTERLY` - Quarterly
+        * `ANNUALLY` - Annually
     GLAccountStatementOutput:
       type: object
       properties:
@@ -15476,6 +16908,408 @@ components:
         sample_invoice:
           type: object
           additionalProperties: {}
+    InvoiceCategory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        code:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+        income_account_code:
+          type: string
+          readOnly: true
+        income_account_name:
+          type: string
+          readOnly: true
+        is_system:
+          type: boolean
+          readOnly: true
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - code
+      - created_at
+      - id
+      - income_account_code
+      - income_account_name
+      - is_system
+      - name
+      - updated_at
+    InvoiceCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        description:
+          type: string
+        income_account_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          nullable: true
+        is_active:
+          type: boolean
+      required:
+      - code
+      - name
+    InvoiceCreateRequest:
+      type: object
+      properties:
+        client_id:
+          type: string
+          format: uuid
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        invoice_type:
+          allOf:
+          - $ref: '#/components/schemas/InvoiceTypeEnum'
+          default: STANDARD
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          default: ''
+        template_id:
+          type: string
+          format: uuid
+          nullable: true
+        currency:
+          type: string
+          minLength: 1
+          default: GHS
+          maxLength: 3
+        exchange_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+          default: '1.000000'
+        billing_period_start:
+          type: string
+          format: date
+          nullable: true
+        billing_period_end:
+          type: string
+          format: date
+          nullable: true
+        reference_number:
+          type: string
+          default: ''
+          maxLength: 100
+        invoice_number:
+          type: string
+          maxLength: 50
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceLineCreateInputRequest'
+        custom_fields:
+          type: object
+          additionalProperties: {}
+        notes:
+          type: string
+          default: ''
+        terms_and_conditions:
+          type: string
+          default: ''
+        footer_text:
+          type: string
+          default: ''
+          maxLength: 255
+        auto_calculate_tax:
+          type: boolean
+          default: true
+      required:
+      - client_id
+      - due_date
+      - issue_date
+      - lines
+    InvoiceDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        invoice_number:
+          type: string
+          maxLength: 50
+        invoice_type:
+          $ref: '#/components/schemas/InvoiceTypeEnum'
+        category:
+          type: string
+          format: uuid
+          nullable: true
+        category_name:
+          type: string
+          readOnly: true
+        category_code:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          description: High-level narrative or summary of the bill
+        client:
+          type: string
+          format: uuid
+        client_name:
+          type: string
+          readOnly: true
+        client_code:
+          type: string
+          readOnly: true
+        template:
+          type: string
+          format: uuid
+          nullable: true
+        template_name:
+          type: string
+          readOnly: true
+        currency:
+          type: string
+          maxLength: 3
+        exchange_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        billing_period_start:
+          type: string
+          format: date
+          nullable: true
+        billing_period_end:
+          type: string
+          format: date
+          nullable: true
+        reference_number:
+          type: string
+          description: Client PO number or contract reference
+          maxLength: 100
+        status:
+          $ref: '#/components/schemas/ClientInvoiceStatusEnum'
+        subtotal:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        discount_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        tax_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        amount_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        balance_due:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        is_paid:
+          type: boolean
+          readOnly: true
+        custom_fields:
+          description: Header custom field key-values (e.g. po_number, site_location)
+        notes:
+          type: string
+        terms_and_conditions:
+          type: string
+        footer_text:
+          type: string
+          maxLength: 255
+        journal_entry:
+          type: string
+          format: uuid
+          nullable: true
+        parent_invoice:
+          type: string
+          format: uuid
+          nullable: true
+          description: Original invoice referenced by this Credit Note or Debit Note
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceLine'
+          readOnly: true
+        tax_lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceTaxLine'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - balance_due
+      - category_code
+      - category_name
+      - client
+      - client_code
+      - client_name
+      - created_at
+      - due_date
+      - id
+      - invoice_number
+      - is_paid
+      - issue_date
+      - lines
+      - tax_lines
+      - template_name
+      - updated_at
+    InvoiceLine:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        item:
+          type: string
+          format: uuid
+          nullable: true
+        item_code:
+          type: string
+          readOnly: true
+        item_name:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          maxLength: 255
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        unit_of_measurement:
+          type: string
+          maxLength: 50
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        discount_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        tax_code:
+          type: string
+          maxLength: 50
+        tax_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,4})?$
+        tax_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        line_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        custom_fields:
+          description: Line custom column key-values (e.g. staff_name, role_designation,
+            days_worked)
+        revenue_account:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - description
+      - id
+      - item_code
+      - item_name
+      - line_total
+      - unit_price
+    InvoiceLineCreateInputRequest:
+      type: object
+      properties:
+        item_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          maxLength: 255
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          default: '1.00'
+        unit_of_measurement:
+          type: string
+          minLength: 1
+          default: Unit
+          maxLength: 50
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        discount_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          default: '0.0000'
+        tax_code:
+          type: string
+          minLength: 1
+          default: VAT_STANDARD
+          maxLength: 50
+        tax_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,4})?$
+          default: '0.1500'
+        custom_fields:
+          type: object
+          additionalProperties: {}
+        revenue_account_id:
+          type: string
+          format: uuid
+          nullable: true
     InvoiceLineInputRequest:
       type: object
       properties:
@@ -15531,6 +17365,181 @@ components:
       - id
       - invoice
       - item_code
+      - updated_at
+    InvoiceLineRequest:
+      type: object
+      properties:
+        item:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          minLength: 1
+          maxLength: 255
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        unit_of_measurement:
+          type: string
+          minLength: 1
+          maxLength: 50
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        discount_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        tax_code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        tax_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,4})?$
+        tax_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        line_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        custom_fields:
+          description: Line custom column key-values (e.g. staff_name, role_designation,
+            days_worked)
+        revenue_account:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - description
+      - line_total
+      - unit_price
+    InvoiceList:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        invoice_number:
+          type: string
+          maxLength: 50
+        invoice_type:
+          $ref: '#/components/schemas/InvoiceTypeEnum'
+        category:
+          type: string
+          format: uuid
+          nullable: true
+        category_name:
+          type: string
+          readOnly: true
+        category_code:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          description: High-level narrative or summary of the bill
+        client:
+          type: string
+          format: uuid
+        client_name:
+          type: string
+          readOnly: true
+        client_code:
+          type: string
+          readOnly: true
+        template:
+          type: string
+          format: uuid
+          nullable: true
+        template_name:
+          type: string
+          readOnly: true
+        currency:
+          type: string
+          maxLength: 3
+        exchange_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        billing_period_start:
+          type: string
+          format: date
+          nullable: true
+        billing_period_end:
+          type: string
+          format: date
+          nullable: true
+        reference_number:
+          type: string
+          description: Client PO number or contract reference
+          maxLength: 100
+        status:
+          $ref: '#/components/schemas/ClientInvoiceStatusEnum'
+        subtotal:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        discount_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        tax_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        amount_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        balance_due:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        is_paid:
+          type: boolean
+          readOnly: true
+        custom_fields:
+          description: Header custom field key-values (e.g. po_number, site_location)
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - balance_due
+      - category_code
+      - category_name
+      - client
+      - client_code
+      - client_name
+      - created_at
+      - due_date
+      - id
+      - invoice_number
+      - is_paid
+      - issue_date
+      - template_name
       - updated_at
     InvoicePaystackInitializeInputRequest:
       type: object
@@ -15605,6 +17614,248 @@ components:
       - message
       - receipt
       - status
+    InvoiceTaxLine:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        tax_type:
+          type: string
+          maxLength: 50
+        rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,4})?$
+        base_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        tax_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+      required:
+      - base_amount
+      - id
+      - rate
+      - tax_amount
+      - tax_type
+    InvoiceTaxLineRequest:
+      type: object
+      properties:
+        tax_type:
+          type: string
+          minLength: 1
+          maxLength: 50
+        rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,4})?$
+        base_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        tax_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+      required:
+      - base_amount
+      - rate
+      - tax_amount
+      - tax_type
+    InvoiceTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        template_name:
+          type: string
+          maxLength: 100
+        preset_code:
+          type: string
+          maxLength: 50
+        client_name:
+          type: string
+          readOnly: true
+        layout_style:
+          $ref: '#/components/schemas/LayoutStyleEnum'
+        primary_color:
+          type: string
+          maxLength: 20
+        secondary_color:
+          type: string
+          maxLength: 20
+        accent_color:
+          type: string
+          maxLength: 20
+        logo_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
+        show_logo:
+          type: boolean
+        font_family:
+          type: string
+          maxLength: 100
+        invoice_title:
+          type: string
+          maxLength: 100
+        show_tax_breakdown:
+          type: boolean
+        show_bank_details:
+          type: boolean
+        show_due_date_badge:
+          type: boolean
+        show_discount:
+          type: boolean
+        show_unit_of_measure:
+          type: boolean
+        default_notes:
+          type: string
+        default_terms:
+          type: string
+        footer_text:
+          type: string
+          maxLength: 255
+        header_custom_fields:
+          description: 'Header custom fields definitions: list of {key, label, type,
+            required, default_value, placeholder, options}'
+        line_custom_fields:
+          description: 'Line custom table column definitions: list of {key, label,
+            type, required, default_value, placeholder, options}'
+        is_default:
+          type: boolean
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - client_name
+      - created_at
+      - id
+      - template_name
+      - updated_at
+    InvoiceTemplateRequest:
+      type: object
+      properties:
+        template_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        preset_code:
+          type: string
+          maxLength: 50
+        client_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          nullable: true
+        layout_style:
+          $ref: '#/components/schemas/LayoutStyleEnum'
+        primary_color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        secondary_color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        accent_color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        logo_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
+        show_logo:
+          type: boolean
+        font_family:
+          type: string
+          minLength: 1
+          maxLength: 100
+        invoice_title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        show_tax_breakdown:
+          type: boolean
+        show_bank_details:
+          type: boolean
+        show_due_date_badge:
+          type: boolean
+        show_discount:
+          type: boolean
+        show_unit_of_measure:
+          type: boolean
+        default_notes:
+          type: string
+        default_terms:
+          type: string
+        footer_text:
+          type: string
+          maxLength: 255
+        header_custom_fields:
+          description: 'Header custom fields definitions: list of {key, label, type,
+            required, default_value, placeholder, options}'
+        line_custom_fields:
+          description: 'Line custom table column definitions: list of {key, label,
+            type, required, default_value, placeholder, options}'
+        is_default:
+          type: boolean
+        is_active:
+          type: boolean
+      required:
+      - template_name
+    InvoiceTypeEnum:
+      enum:
+      - STANDARD
+      - PROFORMA
+      - CREDIT_NOTE
+      - DEBIT_NOTE
+      type: string
+      description: |-
+        * `STANDARD` - Standard Commercial / Tax Invoice
+        * `PROFORMA` - Pro-forma Invoice / Estimate
+        * `CREDIT_NOTE` - Credit Note (Adjustment / Refund)
+        * `DEBIT_NOTE` - Debit Note (Supplemental Charge)
+    InvoiceVoidRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+      required:
+      - reason
+    InvoicingBuilderPreviewInputRequest:
+      type: object
+      properties:
+        template_data:
+          type: object
+          additionalProperties: {}
+        sample_invoice:
+          type: object
+          additionalProperties: {}
+      required:
+      - template_data
     JournalEntryCreateInputRequest:
       type: object
       properties:
@@ -16469,6 +18720,40 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BankTransactionOutput'
+    PaginatedBillableItemList:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Data retrieved successfully.
+        pagination:
+          type: object
+          properties:
+            count:
+              type: integer
+              example: 100
+            total_pages:
+              type: integer
+              example: 2
+            current_page:
+              type: integer
+              example: 1
+            page_size:
+              type: integer
+              example: 50
+            next:
+              type: string
+              nullable: true
+            previous:
+              type: string
+              nullable: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BillableItem'
     PaginatedBudgetOutputList:
       type: object
       properties:
@@ -16809,6 +19094,108 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/GoodsReceivedNoteOutput'
+    PaginatedInvoiceCategoryList:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Data retrieved successfully.
+        pagination:
+          type: object
+          properties:
+            count:
+              type: integer
+              example: 100
+            total_pages:
+              type: integer
+              example: 2
+            current_page:
+              type: integer
+              example: 1
+            page_size:
+              type: integer
+              example: 50
+            next:
+              type: string
+              nullable: true
+            previous:
+              type: string
+              nullable: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceCategory'
+    PaginatedInvoiceListList:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Data retrieved successfully.
+        pagination:
+          type: object
+          properties:
+            count:
+              type: integer
+              example: 100
+            total_pages:
+              type: integer
+              example: 2
+            current_page:
+              type: integer
+              example: 1
+            page_size:
+              type: integer
+              example: 50
+            next:
+              type: string
+              nullable: true
+            previous:
+              type: string
+              nullable: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceList'
+    PaginatedInvoiceTemplateList:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Data retrieved successfully.
+        pagination:
+          type: object
+          properties:
+            count:
+              type: integer
+              example: 100
+            total_pages:
+              type: integer
+              example: 2
+            current_page:
+              type: integer
+              example: 1
+            page_size:
+              type: integer
+              example: 50
+            next:
+              type: string
+              nullable: true
+            previous:
+              type: string
+              nullable: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceTemplate'
     PaginatedJournalEntryOutputList:
       type: object
       properties:
@@ -17013,6 +19400,40 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PurchaseOrderOutput'
+    PaginatedRecurringScheduleList:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Data retrieved successfully.
+        pagination:
+          type: object
+          properties:
+            count:
+              type: integer
+              example: 100
+            total_pages:
+              type: integer
+              example: 2
+            current_page:
+              type: integer
+              example: 1
+            page_size:
+              type: integer
+              example: 50
+            next:
+              type: string
+              nullable: true
+            previous:
+              type: string
+              nullable: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecurringSchedule'
     PaginatedRoleOutputList:
       type: object
       properties:
@@ -17269,6 +19690,48 @@ components:
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
         is_reconciled:
           type: boolean
+    PatchedBillableItemRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        category_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          nullable: true
+        description:
+          type: string
+        default_unit:
+          type: string
+          minLength: 1
+          description: e.g. Days, Hours, Month, Headcount, Project
+          maxLength: 50
+        default_unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        default_tax_code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        default_tax_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,4})?$
+        income_account_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          nullable: true
+        is_active:
+          type: boolean
     PatchedClientInvoiceTemplateUpdateInputRequest:
       type: object
       properties:
@@ -17420,6 +19883,188 @@ components:
         received_date:
           type: string
           format: date
+    PatchedInvoiceCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        description:
+          type: string
+        income_account_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          nullable: true
+        is_active:
+          type: boolean
+    PatchedInvoiceDetailRequest:
+      type: object
+      properties:
+        invoice_number:
+          type: string
+          minLength: 1
+          maxLength: 50
+        invoice_type:
+          $ref: '#/components/schemas/InvoiceTypeEnum'
+        category:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          description: High-level narrative or summary of the bill
+        client:
+          type: string
+          format: uuid
+        template:
+          type: string
+          format: uuid
+          nullable: true
+        currency:
+          type: string
+          minLength: 1
+          maxLength: 3
+        exchange_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,6})?$
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        billing_period_start:
+          type: string
+          format: date
+          nullable: true
+        billing_period_end:
+          type: string
+          format: date
+          nullable: true
+        reference_number:
+          type: string
+          description: Client PO number or contract reference
+          maxLength: 100
+        status:
+          $ref: '#/components/schemas/ClientInvoiceStatusEnum'
+        subtotal:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        discount_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        tax_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        amount_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        custom_fields:
+          description: Header custom field key-values (e.g. po_number, site_location)
+        notes:
+          type: string
+        terms_and_conditions:
+          type: string
+        footer_text:
+          type: string
+          maxLength: 255
+        journal_entry:
+          type: string
+          format: uuid
+          nullable: true
+        parent_invoice:
+          type: string
+          format: uuid
+          nullable: true
+          description: Original invoice referenced by this Credit Note or Debit Note
+    PatchedInvoiceTemplateRequest:
+      type: object
+      properties:
+        template_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        preset_code:
+          type: string
+          maxLength: 50
+        client_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          nullable: true
+        layout_style:
+          $ref: '#/components/schemas/LayoutStyleEnum'
+        primary_color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        secondary_color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        accent_color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        logo_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
+        show_logo:
+          type: boolean
+        font_family:
+          type: string
+          minLength: 1
+          maxLength: 100
+        invoice_title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        show_tax_breakdown:
+          type: boolean
+        show_bank_details:
+          type: boolean
+        show_due_date_badge:
+          type: boolean
+        show_discount:
+          type: boolean
+        show_unit_of_measure:
+          type: boolean
+        default_notes:
+          type: string
+        default_terms:
+          type: string
+        footer_text:
+          type: string
+          maxLength: 255
+        header_custom_fields:
+          description: 'Header custom fields definitions: list of {key, label, type,
+            required, default_value, placeholder, options}'
+        line_custom_fields:
+          description: 'Line custom table column definitions: list of {key, label,
+            type, required, default_value, placeholder, options}'
+        is_default:
+          type: boolean
+        is_active:
+          type: boolean
     PatchedOrganizationUpdateInputRequest:
       type: object
       description: Payload for updating organization settings, plan, and in-house
@@ -17502,6 +20147,44 @@ components:
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
         is_approved:
           type: boolean
+    PatchedRecurringScheduleRequest:
+      type: object
+      properties:
+        schedule_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        client_id:
+          type: string
+          format: uuid
+          writeOnly: true
+        template_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          nullable: true
+        category_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          nullable: true
+        frequency:
+          $ref: '#/components/schemas/FrequencyEnum'
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+          nullable: true
+        auto_issue:
+          type: boolean
+        auto_email:
+          type: boolean
+        invoice_payload:
+          description: 'Template invoice payload: lines, custom fields, notes'
+        status:
+          $ref: '#/components/schemas/RecurringScheduleStatusEnum'
     PatchedRoleUpdateInputRequest:
       type: object
       properties:
@@ -18652,6 +21335,116 @@ components:
       type: string
       description: |-
         * `DRAFT` - Draft
+        * `COMPLETED` - Completed
+    RecurringSchedule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        schedule_name:
+          type: string
+          maxLength: 100
+        client_name:
+          type: string
+          readOnly: true
+        template_name:
+          type: string
+          readOnly: true
+        category_name:
+          type: string
+          readOnly: true
+        frequency:
+          $ref: '#/components/schemas/FrequencyEnum'
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+          nullable: true
+        next_run_date:
+          type: string
+          format: date
+          readOnly: true
+        auto_issue:
+          type: boolean
+        auto_email:
+          type: boolean
+        invoice_payload:
+          description: 'Template invoice payload: lines, custom fields, notes'
+        status:
+          $ref: '#/components/schemas/RecurringScheduleStatusEnum'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category_name
+      - client_name
+      - created_at
+      - id
+      - next_run_date
+      - schedule_name
+      - start_date
+      - template_name
+      - updated_at
+    RecurringScheduleRequest:
+      type: object
+      properties:
+        schedule_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        client_id:
+          type: string
+          format: uuid
+          writeOnly: true
+        template_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          nullable: true
+        category_id:
+          type: string
+          format: uuid
+          writeOnly: true
+          nullable: true
+        frequency:
+          $ref: '#/components/schemas/FrequencyEnum'
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+          nullable: true
+        auto_issue:
+          type: boolean
+        auto_email:
+          type: boolean
+        invoice_payload:
+          description: 'Template invoice payload: lines, custom fields, notes'
+        status:
+          $ref: '#/components/schemas/RecurringScheduleStatusEnum'
+      required:
+      - client_id
+      - schedule_name
+      - start_date
+    RecurringScheduleStatusEnum:
+      enum:
+      - ACTIVE
+      - PAUSED
+      - COMPLETED
+      type: string
+      description: |-
+        * `ACTIVE` - Active
+        * `PAUSED` - Paused
         * `COMPLETED` - Completed
     RemittanceTypeEnum:
       enum:
@@ -19809,6 +22602,48 @@ components:
         * `SSNIT` - Social Security / Pension
         * `WHT` - Withholding Tax
         * `VAT` - Value Added Tax
+    TemplatePreset:
+      type: object
+      properties:
+        preset_code:
+          type: string
+        template_name:
+          type: string
+        layout_style:
+          type: string
+        primary_color:
+          type: string
+        secondary_color:
+          type: string
+        accent_color:
+          type: string
+        invoice_title:
+          type: string
+        default_notes:
+          type: string
+          default: ''
+        default_terms:
+          type: string
+          default: ''
+        footer_text:
+          type: string
+          default: ''
+        header_custom_fields:
+          type: array
+          items: {}
+        line_custom_fields:
+          type: array
+          items: {}
+      required:
+      - accent_color
+      - header_custom_fields
+      - invoice_title
+      - layout_style
+      - line_custom_fields
+      - preset_code
+      - primary_color
+      - secondary_color
+      - template_name
     ThreeWayMatchOutput:
       type: object
       properties:

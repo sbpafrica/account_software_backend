@@ -227,6 +227,17 @@ class CacheManager:
         CacheManager.delete_pattern("fms:organizations:")
 
     @staticmethod
+    def invalidate_invoicing() -> None:
+        """
+        Invalidates invoice lists, categories, templates, billable items,
+        render payloads, and aging/cash forecast reports.
+        """
+        CacheManager.delete_pattern("fms:invoicing:")
+        CacheManager.delete_pattern("fms:aging:")
+        CacheManager.delete_pattern("fms:receivables:")
+        CacheManager.delete(KEY_CASH_FORECAST)
+
+    @staticmethod
     def invalidate_all() -> None:
         """Flushes all SBP-FMS application caches."""
         CacheManager.delete_pattern("fms:")
