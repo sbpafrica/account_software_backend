@@ -15,7 +15,7 @@ from apps.common.serializers import (
 
 
 class AuditLogListAdminApi(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasPermissionCode('audit:read')()]
     pagination_class = CustomPageNumberPagination
 
     @extend_schema(

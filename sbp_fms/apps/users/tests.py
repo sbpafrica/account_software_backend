@@ -273,3 +273,66 @@ class TestRolesAndPermissionsRBAC:
         clear_current_organization()
         regular_user.refresh_from_db()
         assert regular_user.role == role
+
+    def test_organization_owner_has_all_business_permissions_but_no_superadmin_permissions(self, api_client):
+        from apps.organizations.models import Organization, OrganizationMembership, OrganizationRole
+        from apps.users.models import SUPERADMIN_PERMISSIONS, ALL_TENANT_BUSINESS_PERMISSIONS
+
+        org = Organization.objects.create(name="Acme Corp", base_currency="GHS")
+        owner_role, _ = Role.objects.get_or_create(
+            name=UserRole.ORGANIZATION_OWNER,
+            defaults={"is_system_role": True}
+        )
+        owner_user = User.objects.create_user(
+            email="owner@acme.com",
+            password="Password123!",
+            first_name="Acme",
+            last_name="Owner",
+            role=owner_role
+        )
+        OrganizationMembership.objects.create(
+            organization=org,
+            user=owner_user,
+            role=OrganizationRole.OWNER,
+            is_default=True
+        )
+
+        # 1. Verify business permissions evaluate to True
+        assert owner_user.has_permission_code("ledger:write") is True
+        assert owner_user.has_permission_code("invoicing:create") is True
+        assert owner_user.has_permission_code("payables:pay") is True
+        assert owner_user.has_permission_code("assets:create") is True
+        assert owner_user.has_permission_code("budgeting:approve") is True
+        assert owner_user.has_permission_code("payroll:disburse") is True
+        assert owner_user.has_permission_code("users:manage") is True
+
+        # 2. Verify platform superadmin permissions evaluate to False
+        assert owner_user.has_permission_code("*") is False
+        assert owner_user.has_permission_code("audit:read") is False
+        assert owner_user.has_permission_code("audit:all") is False
+        assert owner_user.has_permission_code("roles:write") is False
+        assert owner_user.has_permission_code("roles:manage") is False
+        assert owner_user.has_permission_code("roles:assign_permissions") is False
+        assert owner_user.has_permission_code("organizations:all") is False
+        assert owner_user.has_permission_code("plans:write") is False
+
+        # 3. Verify get_all_permissions contains all tenant business permissions and zero superadmin permissions
+        all_perms = set(owner_user.get_all_permissions())
+        assert "*" not in all_perms
+        assert set(ALL_TENANT_BUSINESS_PERMISSIONS).issubset(all_perms)
+        assert all_perms.intersection(SUPERADMIN_PERMISSIONS) == set()
+
+        # 4. Verify API endpoints block the organization owner with 403 Forbidden
+        api_client.force_authenticate(user=owner_user)
+
+        # Roles & Permissions API
+        role_res = api_client.get(reverse("role-list-create-admin"))
+        assert role_res.status_code == status.HTTP_403_FORBIDDEN
+
+        # Audit Logs API
+        audit_res = api_client.get(reverse("audit-log-list-admin"))
+        assert audit_res.status_code == status.HTTP_403_FORBIDDEN
+
+        # Organizations Directory (Superadmin List) API
+        orgs_res = api_client.get(reverse("organization-admin-list"))
+        assert orgs_res.status_code == status.HTTP_403_FORBIDDEN

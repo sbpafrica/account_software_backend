@@ -84,22 +84,63 @@ class UserRole:
     )
 
 
+# Superadmin-only permission codes that are strictly reserved for platform administrators
+SUPERADMIN_PERMISSIONS = {
+    '*',
+    'audit:read',
+    'audit:export',
+    'audit:all',
+    'roles:read',
+    'roles:write',
+    'roles:delete',
+    'roles:manage',
+    'roles:assign_permissions',
+    'roles:all',
+    'organizations:all',
+    'plans:write',
+    'plans:delete',
+    'plans:manage',
+    'system:admin',
+    'system:audit',
+}
+
+# Complete suite of operational business permissions across all ERP modules
+ALL_TENANT_BUSINESS_PERMISSIONS = [
+    # General Ledger & Chart of Accounts
+    'ledger:read', 'ledger:write', 'ledger:approve', 'ledger:reverse', 'ledger:post',
+    # Invoicing & Billable Catalog
+    'invoicing:read', 'invoicing:write', 'invoicing:create', 'invoicing:approve', 'invoicing:delete',
+    # Accounts Receivable (Clients, Billing, Receipts)
+    'receivables:read', 'receivables:write', 'receivables:create', 'receivables:delete',
+    # Accounts Payable (Suppliers, Purchase Orders, 3-Way Match, Vouchers, Claims)
+    'payables:read', 'payables:create', 'payables:review', 'payables:approve', 'payables:pay', 'payables:match', 'payables:disburse', 'payables:write',
+    # Payroll Escrow & Batches
+    'payroll:read', 'payroll:create', 'payroll:disburse', 'payroll:write',
+    # Treasury & Cash Management
+    'treasury:read', 'treasury:write', 'treasury:reconcile', 'treasury:forecast', 'treasury:manage',
+    # Fixed Assets & Capitalization
+    'assets:read', 'assets:write', 'assets:create', 'assets:depreciate',
+    # Budgeting & Cost Allocation
+    'budgeting:read', 'budgeting:write', 'budgeting:create', 'budgeting:approve',
+    # Client Service Contracts
+    'contracts:read', 'contracts:write', 'contracts:create',
+    # Statutory Taxation & VAT
+    'tax:read', 'tax:write',
+    # Financial Statements & Operational Reports
+    'reports:all', 'reports:read',
+    # Organization Settings & Members
+    'organizations:read', 'organizations:write',
+    'members:read', 'members:write',
+    # Tenant Staff & User Directory Management
+    'users:read', 'users:write', 'users:manage', 'users:assign_role',
+    # Document Vault Attachments
+    'documents:read', 'documents:write',
+]
+
 # Default initial permission code mappings
 DEFAULT_ROLE_PERMISSIONS = {
     UserRole.SUPER_ADMIN: ['*'],
-    UserRole.ORGANIZATION_OWNER: [
-        'ledger:read', 'ledger:write', 'ledger:approve', 'ledger:reverse',
-        'invoicing:read', 'invoicing:write', 'invoicing:create', 'invoicing:approve',
-        'receivables:read', 'receivables:write', 'receivables:create',
-        'payables:read', 'payables:create', 'payables:review', 'payables:approve', 'payables:pay', 'payables:match', 'payables:disburse',
-        'payroll:read', 'payroll:create', 'payroll:disburse',
-        'treasury:read', 'treasury:write', 'treasury:reconcile', 'treasury:forecast',
-        'assets:read', 'assets:write',
-        'reports:all',
-        'tax:read', 'tax:write',
-        'users:read', 'users:write',
-        'organizations:read', 'organizations:write',
-    ],
+    UserRole.ORGANIZATION_OWNER: ALL_TENANT_BUSINESS_PERMISSIONS,
     UserRole.FINANCE_MANAGER: [
         'ledger:read', 'ledger:write', 'ledger:approve', 'ledger:reverse',
         'payroll:read', 'payroll:disburse',
@@ -287,11 +328,29 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         """
         Returns all unique permission codes available to this user,
         aggregating from superuser status, primary role, secondary roles, and direct permissions.
+        Superusers receive the '*' wildcard granting full access.
+        Organization Owners receive all operational business permissions across the ERP suite,
+        strictly excluding platform Superadmin features (audit logs, role definition, system directories).
         """
         if not self.is_active:
             return []
         if self.is_superuser or (self.role and self.role.name == UserRole.SUPER_ADMIN):
             return ['*']
+
+        is_org_owner = (
+            (self.role and self.role.name == UserRole.ORGANIZATION_OWNER)
+            or (self.pk and self.organization_memberships.filter(role='OWNER').exists())
+        )
+        if is_org_owner:
+            perm_codes = set(ALL_TENANT_BUSINESS_PERMISSIONS)
+            if self.role:
+                perm_codes.update(self.role.permissions.values_list('code', flat=True))
+            if self.pk:
+                perm_codes.update(self.roles.values_list('permissions__code', flat=True))
+                perm_codes.update(self.direct_permissions.values_list('code', flat=True))
+            perm_codes.difference_update(SUPERADMIN_PERMISSIONS)
+            perm_codes.discard(None)
+            return sorted(list(perm_codes))
 
         perm_codes = set()
         if self.role:
@@ -311,11 +370,24 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         """
         Evaluates whether the user possesses a specific permission code.
         Superusers and SUPER_ADMIN role bypass all permission checks.
-        Organization owners and other roles are evaluated against their assigned permissions.
+        Organization Owners possess all business/operational permissions across their workspace,
+        but are strictly excluded from Superadmin-only permissions (logs, roles, system directories).
         """
         if not self.is_active:
             return False
         if self.is_superuser or (self.role and self.role.name == UserRole.SUPER_ADMIN):
+            return True
+
+        # Deny access if this is strictly a platform superadmin permission
+        if perm_code in SUPERADMIN_PERMISSIONS:
+            return False
+
+        # If user is an Organization Owner, they possess all business operational permissions
+        is_org_owner = (
+            (self.role and self.role.name == UserRole.ORGANIZATION_OWNER)
+            or (self.pk and self.organization_memberships.filter(role='OWNER').exists())
+        )
+        if is_org_owner:
             return True
 
         if self.role:

@@ -134,8 +134,9 @@ class CanViewUsers(permissions.BasePermission):
 class CanManageRoles(permissions.BasePermission):
     """
     Allows creating roles and configuring role permission mappings.
-    Permits Superusers, Super Admins, Finance Managers, Tenant Admins,
+    Permits Superusers, Super Admins, Finance Managers,
     or users granted 'roles:write' / 'roles:manage' / '*'.
+    Strictly forbidden to tenant organization owners and standard staff.
     """
     def has_permission(self, request, view):
         user = getattr(request, 'user', None)
@@ -156,27 +157,6 @@ class CanManageRoles(permissions.BasePermission):
             or user.has_permission_code('*')
         ):
             return True
-
-        # Check tenant membership (Owner or Admin)
-        current_org = getattr(request, 'organization', None)
-        if not current_org:
-            try:
-                from apps.organizations.context import get_current_organization
-                current_org = get_current_organization()
-            except ImportError:
-                pass
-
-        if current_org:
-            try:
-                from apps.organizations.models import OrganizationMembership, OrganizationRole
-                if OrganizationMembership.objects.filter(
-                    organization=current_org,
-                    user=user,
-                    role__in=[OrganizationRole.OWNER, OrganizationRole.ADMIN]
-                ).exists():
-                    return True
-            except Exception:
-                pass
 
         return False
 
