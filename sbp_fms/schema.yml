@@ -12748,6 +12748,69 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /api/v1/users/admin/users/{user_id}/reset-password/:
+    post:
+      operationId: admin_user_reset_password
+      description: Directly sets a new password for a subordinate user.
+      summary: Reset password of a user account (Admin)
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Users - Users Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserResetPasswordInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminUserResetPasswordInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminUserResetPasswordInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/v1/users/admin/users/create/:
     post:
       operationId: admin_user_create
@@ -12885,6 +12948,151 @@ paths:
                 - message
           description: ''
         '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/users/public/password/change/:
+    post:
+      operationId: public_user_password_change
+      description: Validates the current password and sets a new password for the
+        logged-in user.
+      summary: Change password for current authenticated user
+      tags:
+      - Users - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPasswordChangeInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserPasswordChangeInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserPasswordChangeInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/users/public/password/forgot/:
+    post:
+      operationId: public_user_password_forgot
+      description: Sends a secure password reset link containing a one-time token
+        to the user email address.
+      summary: Request password reset link via email
+      tags:
+      - Users - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserForgotPasswordInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserForgotPasswordInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserForgotPasswordInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/users/public/password/reset/:
+    post:
+      operationId: public_user_password_reset_confirm
+      description: Validates the password reset token and updates the user account
+        with the new password.
+      summary: Confirm password reset using token and set new password
+      tags:
+      - Users - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPasswordResetConfirmInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserPasswordResetConfirmInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserPasswordResetConfirmInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+        '400':
           content:
             application/json:
               schema:
@@ -13144,6 +13352,15 @@ components:
           type: boolean
         description:
           type: string
+    AdminUserResetPasswordInputRequest:
+      type: object
+      properties:
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 8
+      required:
+      - new_password
     AgingReportOutput:
       type: object
       properties:
@@ -23741,6 +23958,22 @@ components:
             minLength: 1
       required:
       - permission_codes
+    UserForgotPasswordInputRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        frontend_url:
+          oneOf:
+          - type: string
+            format: uri
+            default: ''
+          - type: string
+            maxLength: 0
+      required:
+      - email
     UserLoginInputRequest:
       type: object
       properties:
@@ -23838,6 +24071,39 @@ components:
       - role_display
       - role_id
       - updated_at
+    UserPasswordChangeInputRequest:
+      type: object
+      properties:
+        current_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 8
+      required:
+      - current_password
+      - new_password
+    UserPasswordResetConfirmInputRequest:
+      type: object
+      properties:
+        uid:
+          type: string
+          minLength: 1
+          description: Base64-encoded user ID from email link
+        token:
+          type: string
+          minLength: 1
+          description: One-time reset token from email link
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 8
+      required:
+      - new_password
+      - token
+      - uid
     UserRoleAssignInputRequest:
       type: object
       properties:

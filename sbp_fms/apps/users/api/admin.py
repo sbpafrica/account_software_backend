@@ -17,7 +17,7 @@ from apps.users.permissions import (
 from apps.users.serializers import (
     UserOutputSerializer, UserCreateInputSerializer, UserUpdateInputSerializer,
     UserRoleAssignInputSerializer, UserDirectPermissionsAssignInputSerializer,
-    UserDeactivateOutputSerializer,
+    UserDeactivateOutputSerializer, AdminUserResetPasswordInputSerializer,
     RoleOutputSerializer, RoleCreateInputSerializer, RoleUpdateInputSerializer,
     RoleAssignPermissionsInputSerializer,
     PermissionOutputSerializer, PermissionCreateInputSerializer, PermissionUpdateInputSerializer
@@ -494,4 +494,44 @@ class UserDeactivateAdminApi(APIView):
             data={'status': 'DEACTIVATED', 'user_id': str(user.id)},
             message="User account deactivated successfully."
         )
+
+
+class AdminUserResetPasswordApi(APIView):
+    """
+    [FUNCTIONAL & SUPERUSER ADMIN]:
+    Allows an administrator or tenant owner to directly reset a user's password.
+    """
+    permission_classes = [IsAuthenticated, CanManageUsers]
+
+    @extend_schema(
+        tags=['Users - Users Admin'],
+        operation_id='admin_user_reset_password',
+        summary='Reset password of a user account (Admin)',
+        description='Directly sets a new password for a subordinate user.',
+        request=AdminUserResetPasswordInputSerializer,
+        responses={
+            status.HTTP_200_OK: dict,
+            status.HTTP_400_BAD_REQUEST: dict,
+            status.HTTP_403_FORBIDDEN: dict
+        }
+    )
+    def post(self, request, user_id):
+        serializer = AdminUserResetPasswordInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        try:
+            user = UserService.admin_reset_user_password(
+                admin_user=request.user,
+                user_id=user_id,
+                new_password=serializer.validated_data['new_password']
+            )
+            return api_success(
+                data={'user_id': str(user.id), 'email': user.email},
+                message=f"Password for '{user.email}' successfully updated."
+            )
+        except DjangoValidationError as exc:
+            msg = exc.messages[0] if hasattr(exc, 'messages') and exc.messages else str(exc)
+            return api_error(message=msg, status_code=status.HTTP_400_BAD_REQUEST)
+
 

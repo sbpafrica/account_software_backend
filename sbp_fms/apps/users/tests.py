@@ -336,3 +336,74 @@ class TestRolesAndPermissionsRBAC:
         # Organizations Directory (Superadmin List) API
         orgs_res = api_client.get(reverse("organization-admin-list"))
         assert orgs_res.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+class TestPasswordManagement:
+
+    def test_user_can_change_password(self, api_client, regular_user):
+        api_client.force_authenticate(user=regular_user)
+        url = reverse("user-password-change")
+
+        # 1. Fail with incorrect current password
+        res_fail = api_client.post(url, {
+            "current_password": "WrongPassword123!",
+            "new_password": "BrandNewPassword123!"
+        }, format="json")
+        assert res_fail.status_code == status.HTTP_400_BAD_REQUEST
+
+        # 2. Succeed with correct current password
+        res_ok = api_client.post(url, {
+            "current_password": "UserPassword123!",
+            "new_password": "BrandNewPassword123!"
+        }, format="json")
+        assert res_ok.status_code == status.HTTP_200_OK
+
+        # 3. Authenticate with new password
+        regular_user.refresh_from_db()
+        assert regular_user.check_password("BrandNewPassword123!") is True
+
+    def test_forgot_password_and_reset_confirm(self, api_client, regular_user):
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.http import urlsafe_base64_encode
+        from django.utils.encoding import force_bytes
+
+        # 1. Request forgot password
+        url_forgot = reverse("user-password-forgot")
+        res_forgot = api_client.post(url_forgot, {"email": regular_user.email}, format="json")
+        assert res_forgot.status_code == status.HTTP_200_OK
+
+        # 2. Generate valid token & uid for confirm endpoint
+        token = default_token_generator.make_token(regular_user)
+        uidb64 = urlsafe_base64_encode(force_bytes(regular_user.pk))
+
+        url_reset = reverse("user-password-reset-confirm")
+        # Fail with short password
+        res_short = api_client.post(url_reset, {
+            "uid": uidb64,
+            "token": token,
+            "new_password": "short"
+        }, format="json")
+        assert res_short.status_code == status.HTTP_400_BAD_REQUEST
+
+        # Succeed with valid password
+        res_confirm = api_client.post(url_reset, {
+            "uid": uidb64,
+            "token": token,
+            "new_password": "ResetNewPassword123!"
+        }, format="json")
+        assert res_confirm.status_code == status.HTTP_200_OK
+
+        regular_user.refresh_from_db()
+        assert regular_user.check_password("ResetNewPassword123!") is True
+
+    def test_admin_reset_user_password(self, api_client, superuser, regular_user):
+        api_client.force_authenticate(user=superuser)
+        url = reverse("admin-user-reset-password", kwargs={"user_id": str(regular_user.id)})
+
+        res = api_client.post(url, {"new_password": "AdminOverriddenPass123!"}, format="json")
+        assert res.status_code == status.HTTP_200_OK
+
+        regular_user.refresh_from_db()
+        assert regular_user.check_password("AdminOverriddenPass123!") is True
+

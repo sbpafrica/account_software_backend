@@ -144,3 +144,24 @@ class UserDeactivateOutputSerializer(serializers.Serializer):
     status = serializers.CharField()
     user_id = serializers.CharField()
 
+
+class UserPasswordChangeInputSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True, required=True)
+    new_password = serializers.CharField(write_only=True, required=True, min_length=8)
+
+
+class UserForgotPasswordInputSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    frontend_url = serializers.URLField(required=False, allow_blank=True, default='')
+
+
+class UserPasswordResetConfirmInputSerializer(serializers.Serializer):
+    uid = serializers.CharField(required=True, help_text="Base64-encoded user ID from email link")
+    token = serializers.CharField(required=True, help_text="One-time reset token from email link")
+    new_password = serializers.CharField(write_only=True, required=True, min_length=8)
+
+
+class AdminUserResetPasswordInputSerializer(serializers.Serializer):
+    new_password = serializers.CharField(write_only=True, required=True, min_length=8)
+
+
