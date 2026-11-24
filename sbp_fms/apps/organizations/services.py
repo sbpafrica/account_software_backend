@@ -87,12 +87,18 @@ class OrganizationService:
             is_active=True
         )
 
-        # 2. Create Owner User
+        # 2. Create Owner User with ORGANIZATION_OWNER role
+        from apps.users.models import Role, UserRole
+        owner_role, _ = Role.objects.get_or_create(
+            name=UserRole.ORGANIZATION_OWNER,
+            defaults={'description': 'Organization Tenant Owner (Full Management & Billing Control)', 'is_system_role': True}
+        )
         user = User.objects.create_user(
             email=email,
             password=password,
             first_name=first_name,
             last_name=last_name,
+            role=owner_role,
             assigned_country=country_code,
             is_active=True
         )
@@ -252,6 +258,24 @@ class OrganizationService:
         if not created:
             membership.role = invitation.role
             membership.save(update_fields=['role', 'updated_at'])
+
+        # Ensure user has a system role assigned so they never show as 'No Role'
+        if not user.role:
+            from apps.users.models import Role, UserRole
+            role_map = {
+                OrganizationRole.OWNER: UserRole.ORGANIZATION_OWNER,
+                OrganizationRole.ADMIN: UserRole.FINANCE_MANAGER,
+                OrganizationRole.ACCOUNTANT: UserRole.CHIEF_ACCOUNTANT,
+                OrganizationRole.CLERK: UserRole.AR_OFFICER,
+                OrganizationRole.AUDITOR: UserRole.INTERNAL_AUDITOR,
+            }
+            target_role = role_map.get(invitation.role, UserRole.COUNTRY_ACCOUNTANT)
+            role_obj, _ = Role.objects.get_or_create(
+                name=target_role,
+                defaults={'description': f'Assigned {invitation.get_role_display()}', 'is_system_role': True}
+            )
+            user.role = role_obj
+            user.save(update_fields=['role'])
 
         invitation.accepted = True
         invitation.save(update_fields=['accepted', 'updated_at'])
@@ -420,6 +444,107 @@ class OrganizationService:
                 models.Q(billing_email__icontains=search_term)
             )
         return qs
+
+    @staticmethod
+    @transaction.atomic
+    def create_organization_admin(
+        *,
+        organization_name: str,
+        owner_email: str,
+        first_name: str = 'Admin',
+        last_name: str = 'User',
+        password: str = None,
+        role: str = OrganizationRole.OWNER,
+        country_code: str = 'GH',
+        base_currency: str = 'GHS',
+        subdomain: str = None,
+        plan: str = SubscriptionPlanTier.TRIAL,
+    ) -> tuple[Organization, User, OrganizationMembership]:
+        """
+        [SUPERADMIN PROVISIONING]:
+        Provisions a tenant organization on behalf of a client and binds the user as OWNER.
+        Ensures the user account is assigned the ORGANIZATION_OWNER role so they never show as 'No Role'.
+        """
+        import secrets
+        from apps.users.models import Role, UserRole
+
+        organization_name = organization_name.strip()
+        owner_email = owner_email.strip().lower()
+        first_name = first_name.strip()
+        last_name = last_name.strip()
+        country_code = country_code.strip().upper()
+        base_currency = base_currency.strip().upper()
+
+        if subdomain:
+            subdomain = subdomain.strip().lower()
+            if Organization.objects.filter(subdomain=subdomain).exists():
+                raise ValidationError(f"Subdomain '{subdomain}' is already taken.")
+
+        # Resolve plan
+        dyn_plan = SubscriptionPlan.objects.filter(models.Q(code=plan) | models.Q(name__iexact=plan)).first()
+        plan_expires_at = None
+        if dyn_plan and dyn_plan.trial_period_days > 0:
+            plan_expires_at = timezone.now() + datetime.timedelta(days=dyn_plan.trial_period_days)
+        elif plan == SubscriptionPlanTier.TRIAL:
+            plan_expires_at = timezone.now() + datetime.timedelta(days=30)
+
+        # 1. Create Organization
+        organization = Organization.objects.create(
+            name=organization_name,
+            subdomain=subdomain or None,
+            plan=plan,
+            subscription_plan=dyn_plan,
+            plan_expires_at=plan_expires_at,
+            base_currency=base_currency,
+            billing_email=owner_email,
+            is_active=True
+        )
+
+        # 2. Resolve / Create User with ORGANIZATION_OWNER role
+        owner_role, _ = Role.objects.get_or_create(
+            name=UserRole.ORGANIZATION_OWNER,
+            defaults={'description': 'Organization Tenant Owner (Full Management & Billing Control)', 'is_system_role': True}
+        )
+
+        user = User.objects.filter(email=owner_email).first()
+        if not user:
+            user_pwd = password or secrets.token_urlsafe(12)
+            user = User.objects.create_user(
+                email=owner_email,
+                password=user_pwd,
+                first_name=first_name,
+                last_name=last_name,
+                role=owner_role,
+                assigned_country=country_code,
+                is_active=True
+            )
+        else:
+            if not user.role:
+                user.role = owner_role
+                user.save(update_fields=['role'])
+
+        # 3. Create Tenant Membership with role (OWNER)
+        membership, _ = OrganizationMembership.objects.get_or_create(
+            organization=organization,
+            user=user,
+            defaults={'role': role, 'is_default': True}
+        )
+
+        # 4. Initialize CompanyProfile for this tenant
+        try:
+            from apps.ledger.models import CompanyProfile
+            CompanyProfile.objects.create(
+                organization=organization,
+                company_name=organization_name,
+                country_code=country_code,
+                base_currency=base_currency,
+                email=owner_email
+            )
+        except Exception:
+            pass
+
+        CacheManager.invalidate_organizations()
+        return organization, user, membership
 
 
 class SubscriptionPlanService:

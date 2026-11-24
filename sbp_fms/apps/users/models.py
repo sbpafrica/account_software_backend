@@ -60,6 +60,7 @@ class Role(BaseModel):
 class UserRole:
     """Standard predefined role name constants for seeding and backwards compatibility."""
     SUPER_ADMIN = 'SUPER_ADMIN'
+    ORGANIZATION_OWNER = 'ORGANIZATION_OWNER'
     FINANCE_MANAGER = 'FINANCE_MANAGER'
     CHIEF_ACCOUNTANT = 'CHIEF_ACCOUNTANT'
     AR_OFFICER = 'AR_OFFICER'
@@ -71,6 +72,7 @@ class UserRole:
 
     CHOICES = (
         (SUPER_ADMIN, 'Super Admin (CEO / Board)'),
+        (ORGANIZATION_OWNER, 'Organization Owner (Tenant Admin)'),
         (FINANCE_MANAGER, 'Finance Manager'),
         (CHIEF_ACCOUNTANT, 'Chief Accountant'),
         (AR_OFFICER, 'Accounts Receivable Officer'),
@@ -85,6 +87,7 @@ class UserRole:
 # Default initial permission code mappings
 DEFAULT_ROLE_PERMISSIONS = {
     UserRole.SUPER_ADMIN: ['*'],
+    UserRole.ORGANIZATION_OWNER: ['*'],
     UserRole.FINANCE_MANAGER: [
         'ledger:read', 'ledger:write', 'ledger:approve', 'ledger:reverse',
         'payroll:read', 'payroll:disburse',
@@ -248,13 +251,24 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
 
     @property
     def role_name(self) -> str | None:
-        return self.role.name if self.role else None
+        if self.role:
+            return self.role.name
+        # Fallback to default or primary organization membership role
+        if self.pk:
+            membership = self.organization_memberships.filter(is_default=True).first() or self.organization_memberships.first()
+            if membership:
+                return membership.role
+        return None
 
     def get_role_display(self) -> str:
         if self.role:
-            return self.role.name
+            return dict(UserRole.CHOICES).get(self.role.name, self.role.name)
         if self.is_superuser:
             return "Super Admin (CEO / Board)"
+        if self.pk:
+            membership = self.organization_memberships.filter(is_default=True).first() or self.organization_memberships.first()
+            if membership:
+                return f"Organization {membership.get_role_display()}"
         return "No Role"
 
     def get_all_permissions(self) -> list[str]:
@@ -287,7 +301,9 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         """
         if not self.is_active:
             return False
-        if self.is_superuser or (self.role and self.role.name == UserRole.SUPER_ADMIN):
+        if self.is_superuser or (self.role and self.role.name in [UserRole.SUPER_ADMIN, UserRole.ORGANIZATION_OWNER]):
+            return True
+        if self.pk and self.organization_memberships.filter(role='OWNER').exists():
             return True
 
         if self.role:
@@ -311,6 +327,6 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         if self.is_superuser:
             return True
         role_name = self.role.name if self.role else ""
-        if not self.assigned_country or role_name in [UserRole.SUPER_ADMIN, UserRole.FINANCE_MANAGER, UserRole.INTERNAL_AUDITOR]:
+        if not self.assigned_country or role_name in [UserRole.SUPER_ADMIN, UserRole.ORGANIZATION_OWNER, UserRole.FINANCE_MANAGER, UserRole.INTERNAL_AUDITOR]:
             return True
         return self.assigned_country.upper() == country_code.upper()

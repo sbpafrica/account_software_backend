@@ -5,10 +5,14 @@ from apps.users.models import User, Role, Permission
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ('email', 'first_name', 'last_name', 'role', 'assigned_country', 'is_staff', 'is_superuser', 'is_stakeholder', 'is_active')
+    list_display = ('email', 'first_name', 'last_name', 'role_assigned', 'assigned_country', 'is_staff', 'is_superuser', 'is_stakeholder', 'is_active')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'is_stakeholder', 'role', 'assigned_country')
     search_fields = ('email', 'first_name', 'last_name')
     ordering = ('email',)
+
+    @admin.display(description='Role')
+    def role_assigned(self, obj):
+        return obj.get_role_display()
 
     fieldsets = (
         (None, {'fields': ('email', 'password')}),

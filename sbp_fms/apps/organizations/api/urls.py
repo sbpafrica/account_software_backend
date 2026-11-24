@@ -9,6 +9,7 @@ from .views import (
     OrganizationDeactivateApi,
     OrganizationReactivateApi,
     OrganizationAdminListApi,
+    OrganizationAdminCreateApi,
     SubscriptionPlanListPublicApi,
     SubscriptionPlanListCreateAdminApi,
     SubscriptionPlanDetailAdminApi,
@@ -24,6 +25,7 @@ urlpatterns = [
 
     # Superadmin Platform Organization Management
     path('admin/list/', OrganizationAdminListApi.as_view(), name='organization-admin-list'),
+    path('admin/create/', OrganizationAdminCreateApi.as_view(), name='organization-admin-create'),
 
     # User's tenant memberships & tenant switcher
     path('me/', OrganizationMeListApi.as_view(), name='organization-me-list'),

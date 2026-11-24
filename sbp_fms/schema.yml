@@ -4140,6 +4140,57 @@ paths:
           description: ''
         '400':
           description: Expired or invalid invitation
+  /api/v1/organizations/admin/create/:
+    post:
+      operationId: organization_admin_create
+      description: Creates a tenant organization and owner user account with OWNER
+        role. Restricted to Platform Superadmins.
+      summary: Create new organization account for someone (Superadmin)
+      tags:
+      - Organizations & Multi-Tenancy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationAdminCreateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrganizationAdminCreateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrganizationAdminCreateInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/OrganizationOutput'
+                required:
+                - success
+                - message
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          description: Insufficient permissions
   /api/v1/organizations/admin/list/:
     get:
       operationId: organization_admin_list
@@ -18089,6 +18140,56 @@ components:
           description: Unique invitation UUID token received via invite.
       required:
       - token
+    OrganizationAdminCreateInputRequest:
+      type: object
+      properties:
+        organization_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        owner_email:
+          type: string
+          format: email
+          minLength: 1
+        owner_first_name:
+          type: string
+          minLength: 1
+          default: Admin
+          maxLength: 150
+        owner_last_name:
+          type: string
+          minLength: 1
+          default: User
+          maxLength: 150
+        owner_password:
+          type: string
+          nullable: true
+        role:
+          allOf:
+          - $ref: '#/components/schemas/OrganizationRoleEnum'
+          default: OWNER
+        country_code:
+          type: string
+          minLength: 1
+          default: GH
+          maxLength: 2
+        base_currency:
+          type: string
+          minLength: 1
+          default: GHS
+          maxLength: 3
+        subdomain:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 100
+        plan:
+          type: string
+          minLength: 1
+          default: TRIAL
+      required:
+      - organization_name
+      - owner_email
     OrganizationInvitationOutput:
       type: object
       description: Output representation of an invitation.
@@ -22799,6 +22900,13 @@ components:
           nullable: true
           minLength: 1
           maxLength: 2
+        organization_id:
+          type: string
+          format: uuid
+          nullable: true
+        organization_role:
+          type: string
+          nullable: true
         permission_codes:
           type: array
           items:

@@ -508,3 +508,63 @@ class TestMultiTenantAdminIsolation:
 
 
 
+
+
+    def test_superadmin_create_organization_account_assigns_role(self, api_client, admin_user):
+        """
+        Tests that when superadmin creates an organizational account for someone,
+        the user is assigned the ORGANIZATION_OWNER role and their role never shows as 'No Role'.
+        """
+        api_client.force_authenticate(user=admin_user)
+
+        res = api_client.post("/api/v1/organizations/admin/create/", {
+            "organization_name": "Tarkwa Mining Resources Ltd",
+            "owner_email": "finance.director@tarkwamining.com",
+            "owner_first_name": "Ebenezer",
+            "owner_last_name": "Addae",
+            "country_code": "GH",
+            "base_currency": "GHS",
+        }, format="json")
+
+        assert res.status_code == status.HTTP_201_CREATED
+        data = res.json()["data"]
+        assert data["name"] == "Tarkwa Mining Resources Ltd"
+
+        # Verify User and Role in DB
+        owner_user = User.objects.get(email="finance.director@tarkwamining.com")
+        assert owner_user.role is not None
+        assert owner_user.role.name == "ORGANIZATION_OWNER"
+        assert owner_user.role_name == "ORGANIZATION_OWNER"
+        assert "Organization Owner" in owner_user.get_role_display()
+        assert owner_user.get_role_display() != "No Role"
+
+        # Verify membership
+        membership = OrganizationMembership.objects.get(user=owner_user)
+        assert membership.role == OrganizationRole.OWNER
+        assert membership.is_default is True
+
+    def test_organization_membership_fallback_role_display(self):
+        """
+        Verifies that even if user.role is temporarily None, a user with an
+        OrganizationMembership displays their organizational role instead of 'No Role'.
+        """
+        org = Organization.objects.create(name="Delta Mining Group", base_currency="GHS")
+        user = User.objects.create_user(
+            email="ops.manager@deltamining.com",
+            first_name="Kwesi",
+            last_name="Arthur",
+            is_active=True
+        )
+        assert user.role is None
+
+        # Link to organization as OWNER
+        OrganizationMembership.objects.create(
+            organization=org,
+            user=user,
+            role=OrganizationRole.OWNER,
+            is_default=True
+        )
+
+        assert user.role_name == "OWNER"
+        assert "Organization Owner" in user.get_role_display()
+        assert user.get_role_display() != "No Role"

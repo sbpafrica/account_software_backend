@@ -74,6 +74,19 @@ class OrganizationOutputSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class OrganizationAdminCreateInputSerializer(serializers.Serializer):
+    organization_name = serializers.CharField(max_length=255)
+    owner_email = serializers.EmailField()
+    owner_first_name = serializers.CharField(max_length=150, default='Admin', required=False)
+    owner_last_name = serializers.CharField(max_length=150, default='User', required=False)
+    owner_password = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    role = serializers.ChoiceField(choices=OrganizationRole.choices, default=OrganizationRole.OWNER, required=False)
+    country_code = serializers.CharField(max_length=2, default='GH', required=False)
+    base_currency = serializers.CharField(max_length=3, default='GHS', required=False)
+    subdomain = serializers.CharField(max_length=100, required=False, allow_null=True)
+    plan = serializers.CharField(default=SubscriptionPlanTier.TRIAL, required=False)
+
+
 class OrganizationMembershipOutputSerializer(serializers.ModelSerializer):
     """
     Output representation of a user's membership within an organization.

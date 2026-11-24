@@ -126,6 +126,7 @@ class UserService:
     @transaction.atomic
     def user_create(*, email: str, password: str, first_name: str, last_name: str,
                     role: str | Role = None, assigned_country: str = None,
+                    organization_id = None, organization_role: str = None,
                     permission_codes: list[str] = None) -> User:
         if User.objects.filter(email=email).exists():
             raise ValidationError(f"A user with email '{email}' already exists.")
@@ -140,6 +141,27 @@ class UserService:
             role=resolved_role,
             assigned_country=assigned_country
         )
+
+        if organization_id:
+            from apps.organizations.models import Organization, OrganizationMembership, OrganizationRole
+            from apps.users.models import UserRole
+            org = Organization.objects.filter(id=organization_id).first()
+            if org:
+                org_role = organization_role or OrganizationRole.OWNER
+                OrganizationMembership.objects.create(
+                    organization=org,
+                    user=user,
+                    role=org_role,
+                    is_default=True
+                )
+                if not resolved_role:
+                    target_role = UserRole.ORGANIZATION_OWNER if org_role == 'OWNER' else UserRole.FINANCE_MANAGER
+                    role_obj, _ = Role.objects.get_or_create(
+                        name=target_role,
+                        defaults={'description': f'Assigned {org_role}', 'is_system_role': True}
+                    )
+                    user.role = role_obj
+                    user.save(update_fields=['role'])
 
         if permission_codes:
             perms = Permission.objects.filter(code__in=[p.strip().lower() for p in permission_codes])

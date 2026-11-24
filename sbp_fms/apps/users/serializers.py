@@ -97,6 +97,8 @@ class UserCreateInputSerializer(serializers.Serializer):
     last_name = serializers.CharField(max_length=150)
     role = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
     assigned_country = serializers.CharField(max_length=2, required=False, allow_null=True)
+    organization_id = serializers.UUIDField(required=False, allow_null=True, default=None)
+    organization_role = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
     permission_codes = serializers.ListField(
         child=serializers.CharField(),
         required=False,

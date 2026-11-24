@@ -23,6 +23,7 @@ from apps.organizations.selectors import (
 )
 from apps.organizations.serializers import (
     OrganizationOutputSerializer,
+    OrganizationAdminCreateInputSerializer,
     OrganizationMembershipOutputSerializer,
     OrganizationRegisterInputSerializer,
     OrganizationRegisterOutputSerializer,
@@ -411,6 +412,50 @@ class OrganizationAdminListApi(APIView):
         )
         data = OrganizationOutputSerializer(qs, many=True).data
         return api_success(data=data)
+
+
+class OrganizationAdminCreateApi(APIView):
+    """
+    [SUPERADMIN API]:
+    Provisions a new customer organization and assigns the initial owner role to the customer.
+    Ensures the user account is automatically bound to the organization as OWNER so they never show as 'No Role'.
+    """
+    permission_classes = [IsAuthenticated, IsSuperUser]
+
+    @extend_schema(
+        tags=['Organizations & Multi-Tenancy'],
+        operation_id='organization_admin_create',
+        summary='Create new organization account for someone (Superadmin)',
+        description='Creates a tenant organization and owner user account with OWNER role. Restricted to Platform Superadmins.',
+        request=OrganizationAdminCreateInputSerializer,
+        responses={
+            status.HTTP_201_CREATED: OrganizationOutputSerializer,
+            status.HTTP_400_BAD_REQUEST: dict,
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(description="Insufficient permissions"),
+        }
+    )
+    def post(self, request):
+        serializer = OrganizationAdminCreateInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        org, user, membership = OrganizationService.create_organization_admin(
+            organization_name=data['organization_name'],
+            owner_email=data['owner_email'],
+            first_name=data.get('owner_first_name', 'Admin'),
+            last_name=data.get('owner_last_name', 'User'),
+            password=data.get('owner_password'),
+            role=data.get('role', OrganizationRole.OWNER),
+            country_code=data.get('country_code', 'GH'),
+            base_currency=data.get('base_currency', 'GHS'),
+            subdomain=data.get('subdomain'),
+            plan=data.get('plan', 'TRIAL'),
+        )
+        return api_success(
+            data=OrganizationOutputSerializer(org).data,
+            message=f"Organization '{org.name}' created with owner '{user.email}' (Role: {membership.get_role_display()}).",
+            status_code=status.HTTP_201_CREATED
+        )
 
 
 # ============================================================================
