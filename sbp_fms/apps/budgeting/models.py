@@ -1,7 +1,7 @@
 from decimal import Decimal
 from django.conf import settings
 from django.db import models
-from apps.common.models import BaseModel
+from apps.common.models import BaseModel, TenantModel
 
 
 class BudgetStatus(models.TextChoices):
@@ -11,7 +11,7 @@ class BudgetStatus(models.TextChoices):
     CLOSED = 'CLOSED', 'Closed'
 
 
-class Budget(BaseModel):
+class Budget(TenantModel):
     name = models.CharField(max_length=150)
     financial_year = models.PositiveIntegerField(db_index=True)
     department = models.CharField(max_length=100, blank=True, default='')

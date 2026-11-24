@@ -85,6 +85,15 @@ class AuditLog(models.Model):
     Enterprise immutable audit log recording every system mutation, financial posting, and approval.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(
+        'organizations.Organization',
+        on_delete=models.CASCADE,
+        related_name='audit_logs',
+        db_index=True,
+        null=True,
+        blank=True,
+        help_text="Tenant organization that owns this audit entry."
+    )
     actor_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     action = models.CharField(max_length=50, db_index=True)  # CREATE, UPDATE, DELETE, POST, REVERSE, APPROVE, REJECT
     module = models.CharField(max_length=50, db_index=True)  # ledger, payables, receivables, treasury, payroll
@@ -95,15 +104,29 @@ class AuditLog(models.Model):
     changes = models.JSONField(default=dict, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
+    objects = TenantManager()
+    all_objects = models.Manager()
+
     class Meta:
         ordering = ['-timestamp']
+
+    def save(self, *args, **kwargs):
+        if not self.organization_id:
+            try:
+                from apps.organizations.context import get_current_organization
+                current_org = get_current_organization()
+                if current_org:
+                    self.organization = current_org
+            except ImportError:
+                pass
+        super().save(*args, **kwargs)
 
     def __str__(self):
         actor = self.actor_user.email if self.actor_user else 'SYSTEM'
         return f"[{self.timestamp}] {actor} -> {self.action} on {self.resource_type}:{self.resource_id}"
 
 
-class DocumentAttachment(BaseModel):
+class DocumentAttachment(TenantModel):
     """
     Central document vault storing proofs, scanned invoices, vendor receipts, and contracts.
     """

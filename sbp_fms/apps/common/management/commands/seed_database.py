@@ -38,6 +38,7 @@ from apps.consolidation.models import ExchangeRate, RateType
 from apps.budgeting.models import Budget, BudgetLine, BudgetStatus
 from apps.contracts.models import Contract, ContractStatus
 from apps.common.models import AuditLog
+from apps.organizations.context import set_current_organization, clear_current_organization
 
 logger = logging.getLogger(__name__)
 
@@ -83,35 +84,40 @@ class Command(BaseCommand):
             self.stdout.write("==> [4/14] Seeding Organizations & Memberships...")
             orgs_map = self._seed_organizations(plans_map, users_map)
 
-            self.stdout.write("==> [5/14] Seeding Chart of Accounts, Departments & Cost Centres...")
-            ledger_data = self._seed_ledger(orgs_map['primary'], users_map)
+            # Bind multi-tenant context to primary organization during demo data seeding
+            set_current_organization(orgs_map['primary'])
+            try:
+                self.stdout.write("==> [5/14] Seeding Chart of Accounts, Departments & Cost Centres...")
+                ledger_data = self._seed_ledger(orgs_map['primary'], users_map)
 
-            self.stdout.write("==> [6/14] Seeding Multi-Country Statutory Tax Rules...")
-            self._seed_taxation()
+                self.stdout.write("==> [6/14] Seeding Multi-Country Statutory Tax Rules...")
+                self._seed_taxation()
 
-            self.stdout.write("==> [7/14] Seeding Treasury Bank Accounts & Bank Statements...")
-            treasury_data = self._seed_treasury(ledger_data, users_map)
+                self.stdout.write("==> [7/14] Seeding Treasury Bank Accounts & Bank Statements...")
+                treasury_data = self._seed_treasury(ledger_data, users_map)
 
-            self.stdout.write("==> [8/14] Seeding Foreign Exchange Rates & Multi-Currency...")
-            self._seed_exchange_rates()
+                self.stdout.write("==> [8/14] Seeding Foreign Exchange Rates & Multi-Currency...")
+                self._seed_exchange_rates()
 
-            self.stdout.write("==> [9/14] Seeding Fixed Assets & Depreciation...")
-            self._seed_assets(ledger_data, users_map)
+                self.stdout.write("==> [9/14] Seeding Fixed Assets & Depreciation...")
+                self._seed_assets(ledger_data, users_map)
 
-            self.stdout.write("==> [10/14] Seeding Receivables (Clients, Invoices & Receipts)...")
-            self._seed_receivables(treasury_data, ledger_data, users_map)
+                self.stdout.write("==> [10/14] Seeding Receivables (Clients, Invoices & Receipts)...")
+                self._seed_receivables(treasury_data, ledger_data, users_map)
 
-            self.stdout.write("==> [11/14] Seeding Payables (Suppliers, 3-Way Match, Vouchers & Expenses)...")
-            self._seed_payables(treasury_data, ledger_data, users_map)
+                self.stdout.write("==> [11/14] Seeding Payables (Suppliers, 3-Way Match, Vouchers & Expenses)...")
+                self._seed_payables(treasury_data, ledger_data, users_map)
 
-            self.stdout.write("==> [12/14] Seeding Payroll Escrow Batches...")
-            self._seed_payroll_escrow(users_map)
+                self.stdout.write("==> [12/14] Seeding Payroll Escrow Batches...")
+                self._seed_payroll_escrow(users_map)
 
-            self.stdout.write("==> [13/14] Seeding Annual Operating Budgets...")
-            self._seed_budgeting(ledger_data, users_map)
+                self.stdout.write("==> [13/14] Seeding Annual Operating Budgets...")
+                self._seed_budgeting(ledger_data, users_map)
 
-            self.stdout.write("==> [14/14] Seeding Client Service Contracts...")
-            self._seed_contracts()
+                self.stdout.write("==> [14/14] Seeding Client Service Contracts...")
+                self._seed_contracts()
+            finally:
+                clear_current_organization()
 
         self.stdout.write(self.style.SUCCESS("\n[+] Database seeding completed successfully!"))
         self.stdout.write(self.style.SUCCESS("--------------------------------------------------"))

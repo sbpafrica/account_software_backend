@@ -87,7 +87,19 @@ class UserRole:
 # Default initial permission code mappings
 DEFAULT_ROLE_PERMISSIONS = {
     UserRole.SUPER_ADMIN: ['*'],
-    UserRole.ORGANIZATION_OWNER: ['*'],
+    UserRole.ORGANIZATION_OWNER: [
+        'ledger:read', 'ledger:write', 'ledger:approve', 'ledger:reverse',
+        'invoicing:read', 'invoicing:write', 'invoicing:create', 'invoicing:approve',
+        'receivables:read', 'receivables:write', 'receivables:create',
+        'payables:read', 'payables:create', 'payables:review', 'payables:approve', 'payables:pay', 'payables:match', 'payables:disburse',
+        'payroll:read', 'payroll:create', 'payroll:disburse',
+        'treasury:read', 'treasury:write', 'treasury:reconcile', 'treasury:forecast',
+        'assets:read', 'assets:write',
+        'reports:all',
+        'tax:read', 'tax:write',
+        'users:read', 'users:write',
+        'organizations:read', 'organizations:write',
+    ],
     UserRole.FINANCE_MANAGER: [
         'ledger:read', 'ledger:write', 'ledger:approve', 'ledger:reverse',
         'payroll:read', 'payroll:disburse',
@@ -298,12 +310,12 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     def has_permission_code(self, perm_code: str) -> bool:
         """
         Evaluates whether the user possesses a specific permission code.
+        Superusers and SUPER_ADMIN role bypass all permission checks.
+        Organization owners and other roles are evaluated against their assigned permissions.
         """
         if not self.is_active:
             return False
-        if self.is_superuser or (self.role and self.role.name in [UserRole.SUPER_ADMIN, UserRole.ORGANIZATION_OWNER]):
-            return True
-        if self.pk and self.organization_memberships.filter(role='OWNER').exists():
+        if self.is_superuser or (self.role and self.role.name == UserRole.SUPER_ADMIN):
             return True
 
         if self.role:

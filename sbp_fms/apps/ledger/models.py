@@ -134,7 +134,7 @@ class JournalEntryStatus(models.TextChoices):
     POSTED = 'POSTED', 'Posted'
     REVERSED = 'REVERSED', 'Reversed'
 
-class JournalEntry(BaseModel):
+class JournalEntry(TenantModel):
     entry_number = models.CharField(max_length=50, unique=True, db_index=True)
     posting_date = models.DateField(db_index=True)
     status = models.CharField(

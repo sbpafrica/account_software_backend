@@ -1,7 +1,7 @@
 from decimal import Decimal
 from django.conf import settings
 from django.db import models
-from apps.common.models import BaseModel
+from apps.common.models import BaseModel, TenantModel
 from apps.ledger.models import Account
 
 
@@ -37,7 +37,7 @@ class AssetCategory(BaseModel):
         return f"{self.code} - {self.name}"
 
 
-class FixedAsset(BaseModel):
+class FixedAsset(TenantModel):
     asset_tag = models.CharField(max_length=50, unique=True, db_index=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default='')
@@ -80,7 +80,7 @@ class DepreciationRunStatus(models.TextChoices):
     POSTED = 'POSTED', 'Posted'
 
 
-class DepreciationRun(BaseModel):
+class DepreciationRun(TenantModel):
     run_number = models.CharField(max_length=50, unique=True, db_index=True)
     period_end_date = models.DateField(db_index=True)
     total_depreciation = models.DecimalField(max_digits=18, decimal_places=4, default=Decimal('0.0000'))

@@ -1,9 +1,9 @@
 from decimal import Decimal
 from django.db import models
 from django.conf import settings
-from apps.common.models import BaseModel
+from apps.common.models import BaseModel, TenantModel
 
-class Supplier(BaseModel):
+class Supplier(TenantModel):
     name = models.CharField(max_length=255)
     tax_id = models.CharField(max_length=50)
     country_code = models.CharField(max_length=2, default='GH')
@@ -23,7 +23,7 @@ class Supplier(BaseModel):
     def __str__(self):
         return f"{self.name} (TIN: {self.tax_id})"
 
-class PurchaseOrder(BaseModel):
+class PurchaseOrder(TenantModel):
     po_number = models.CharField(max_length=50, unique=True)
     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name='purchase_orders')
     total_approved_amount = models.DecimalField(max_digits=18, decimal_places=4)
@@ -38,7 +38,7 @@ class POLine(BaseModel):
     quantity = models.PositiveIntegerField()
     approved_unit_price = models.DecimalField(max_digits=18, decimal_places=4)
 
-class GoodsReceivedNote(BaseModel):
+class GoodsReceivedNote(TenantModel):
     grn_number = models.CharField(max_length=50, unique=True)
     po = models.ForeignKey(PurchaseOrder, on_delete=models.PROTECT, related_name='grns')
     received_date = models.DateField()
@@ -54,7 +54,7 @@ class MatchStatus(models.TextChoices):
     BLOCKED_DISCREPANCY = 'BLOCKED_DISCREPANCY', 'Price/Qty Discrepancy Found'
     PAID = 'PAID', 'Settled & Paid'
 
-class SupplierInvoice(BaseModel):
+class SupplierInvoice(TenantModel):
     invoice_number = models.CharField(max_length=50)
     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name='invoices')
     po = models.ForeignKey(PurchaseOrder, on_delete=models.PROTECT, related_name='invoices')
@@ -107,7 +107,7 @@ class PaymentVoucherStatus(models.TextChoices):
     REJECTED = 'REJECTED', 'Rejected'
     REVERSED = 'REVERSED', 'Reversed'
 
-class PaymentVoucher(BaseModel):
+class PaymentVoucher(TenantModel):
     voucher_number = models.CharField(max_length=50, unique=True)
     voucher_date = models.DateField()
     payment_date = models.DateField(null=True, blank=True)
@@ -162,7 +162,7 @@ class ExpenseClaimType(models.TextChoices):
     RETIREMENT = 'RETIREMENT', 'Advance Expense Retirement'
 
 
-class ExpenseClaim(BaseModel):
+class ExpenseClaim(TenantModel):
     claim_number = models.CharField(max_length=50, unique=True, db_index=True)
     claim_date = models.DateField(db_index=True)
     employee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='expense_claims')

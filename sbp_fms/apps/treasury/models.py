@@ -1,11 +1,11 @@
 from decimal import Decimal
 from django.conf import settings
 from django.db import models
-from apps.common.models import BaseModel
+from apps.common.models import BaseModel, TenantModel
 from apps.ledger.models import Account
 
 
-class BankAccount(BaseModel):
+class BankAccount(TenantModel):
     bank_name = models.CharField(max_length=100)
     account_number = models.CharField(max_length=50, unique=True)
     branch_name = models.CharField(max_length=100, blank=True, default='')
@@ -19,7 +19,7 @@ class BankAccount(BaseModel):
         return f"{self.bank_name} - {self.account_number} ({self.currency})"
 
 
-class BankTransaction(BaseModel):
+class BankTransaction(TenantModel):
     bank_account = models.ForeignKey(BankAccount, on_delete=models.CASCADE, related_name='transactions')
     transaction_date = models.DateField(db_index=True)
     bank_reference = models.CharField(max_length=100, db_index=True)
@@ -38,7 +38,7 @@ class BankTransaction(BaseModel):
         return f"{self.bank_reference} ({self.amount}) - Reconciled: {self.is_reconciled}"
 
 
-class BankStatement(BaseModel):
+class BankStatement(TenantModel):
     bank_account = models.ForeignKey(BankAccount, on_delete=models.CASCADE, related_name='statements')
     statement_date = models.DateField(db_index=True)
     start_date = models.DateField(null=True, blank=True)
@@ -91,7 +91,7 @@ class ReconciliationStatus(models.TextChoices):
     COMPLETED = 'COMPLETED', 'Completed'
 
 
-class BankReconciliation(BaseModel):
+class BankReconciliation(TenantModel):
     reconciliation_number = models.CharField(max_length=50, unique=True, db_index=True)
     bank_account = models.ForeignKey(BankAccount, on_delete=models.CASCADE, related_name='reconciliations')
     statement_date = models.DateField(db_index=True)
@@ -135,7 +135,7 @@ class BankFeedStatus(models.TextChoices):
     ERROR = 'ERROR', 'Authentication / Network Error'
 
 
-class BankFeedConnection(BaseModel):
+class BankFeedConnection(TenantModel):
     bank_account = models.OneToOneField(BankAccount, on_delete=models.CASCADE, related_name='feed_connection')
     provider = models.CharField(max_length=50, choices=BankFeedProvider.choices, default=BankFeedProvider.MONO)
     status = models.CharField(max_length=30, choices=BankFeedStatus.choices, default=BankFeedStatus.DISCONNECTED)

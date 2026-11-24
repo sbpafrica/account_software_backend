@@ -568,3 +568,115 @@ class TestMultiTenantAdminIsolation:
         assert user.role_name == "OWNER"
         assert "Organization Owner" in user.get_role_display()
         assert user.get_role_display() != "No Role"
+
+    def test_cross_tenant_data_isolation_across_all_modules(self):
+        """
+        [MULTI-TENANCY END-TO-END VERIFICATION]:
+        Guarantees that financial and operational entities across Fixed Assets,
+        Receivables, Payables, Treasury, and Invoicing are strictly isolated per tenant.
+        A newly created organization must start with a clean zero state.
+        """
+        from decimal import Decimal
+        from apps.assets.models import FixedAsset, AssetCategory, DepreciationMethod
+        from apps.assets.selectors import fixed_asset_list, asset_register_summary_get
+        from apps.receivables.models import Client
+        from apps.payables.models import Supplier
+        from apps.treasury.models import BankAccount
+        from apps.ledger.models import Account, AccountType
+        from apps.invoicing.models import Invoice
+
+        org_a = Organization.objects.create(name="Tenant Alpha Corp", base_currency="GHS")
+        org_b = Organization.objects.create(name="Tenant Beta Ltd", base_currency="USD")
+
+        # 1. Populate records under Tenant Alpha
+        set_current_organization(org_a)
+
+        gl_asset = Account.objects.create(code="1500-TEST-A", name="Asset A", account_type=AccountType.ASSET)
+        gl_accum = Account.objects.create(code="1509-TEST-A", name="Accum A", account_type=AccountType.ASSET)
+        gl_depr = Account.objects.create(code="6050-TEST-A", name="Depr A", account_type=AccountType.OPEX)
+        gl_bank = Account.objects.create(code="1020-TEST-A", name="Bank GL A", account_type=AccountType.ASSET)
+
+        cat_a = AssetCategory.objects.create(
+            code="CAT-A",
+            name="IT Equipment",
+            asset_gl_account=gl_asset,
+            accumulated_depr_gl_account=gl_accum,
+            depr_expense_gl_account=gl_depr
+        )
+
+        asset_a = FixedAsset.objects.create(
+            asset_tag="AST-ALPHA-001",
+            name="Alpha Server Rack",
+            category=cat_a,
+            purchase_date="2026-01-01",
+            purchase_cost=Decimal("50000.0000"),
+            net_book_value=Decimal("50000.0000")
+        )
+        assert asset_a.organization == org_a
+
+        client_a = Client.objects.create(
+            name="Alpha Customer 1",
+            code="CL-A-001",
+            country_code="GH"
+        )
+        assert client_a.organization == org_a
+
+        supplier_a = Supplier.objects.create(
+            name="Alpha Vendor 1",
+            tax_id="TIN-A-001",
+            country_code="GH"
+        )
+        assert supplier_a.organization == org_a
+
+        bank_a = BankAccount.objects.create(
+            bank_name="Alpha National Bank",
+            account_number="ACC-A-001",
+            gl_account=gl_bank,
+            currency="GHS"
+        )
+        assert bank_a.organization == org_a
+
+        invoice_a = Invoice.objects.create(
+            invoice_number="INV-ALPHA-001",
+            client=client_a,
+            currency="GHS",
+            issue_date="2026-01-15",
+            due_date="2026-02-15",
+            total_amount=Decimal("10000.0000")
+        )
+        assert invoice_a.organization == org_a
+
+        # 2. Switch context to Tenant Beta (Must see ZERO records)
+        set_current_organization(org_b)
+
+        assert FixedAsset.objects.count() == 0
+        assert len(fixed_asset_list()) == 0
+        summary_b = asset_register_summary_get()
+        assert summary_b['total_asset_count'] == 0
+        assert summary_b['total_acquisition_cost'] == Decimal('0.0000')
+
+        assert Client.objects.count() == 0
+        assert Supplier.objects.count() == 0
+        assert BankAccount.objects.count() == 0
+        assert Invoice.objects.count() == 0
+
+        # 3. Create record under Tenant Beta
+        client_b = Client.objects.create(
+            name="Beta Customer 1",
+            code="CL-B-001",
+            country_code="US"
+        )
+        assert client_b.organization == org_b
+        assert Client.objects.count() == 1
+
+        # 4. Switch back to Tenant Alpha (Must see only Alpha records)
+        set_current_organization(org_a)
+
+        assert FixedAsset.objects.count() == 1
+        assert Client.objects.count() == 1
+        assert Client.objects.first().code == "CL-A-001"
+        assert Supplier.objects.count() == 1
+        assert BankAccount.objects.count() == 1
+        assert Invoice.objects.count() == 1
+
+        clear_current_organization()

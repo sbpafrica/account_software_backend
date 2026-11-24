@@ -1,9 +1,9 @@
 from decimal import Decimal
 from django.db import models
 from django.conf import settings
-from apps.common.models import BaseModel
+from apps.common.models import BaseModel, TenantModel
 
-class Client(BaseModel):
+class Client(TenantModel):
     name = models.CharField(max_length=255)
     code = models.CharField(max_length=50, unique=True)
     country_code = models.CharField(max_length=2, default='GH')
@@ -32,7 +32,7 @@ class InvoiceLayoutStyle(models.TextChoices):
     DETAILED_STAFFING = 'DETAILED_STAFFING', 'Detailed Staffing & Timesheet'
 
 
-class ClientInvoiceTemplate(BaseModel):
+class ClientInvoiceTemplate(TenantModel):
     template_name = models.CharField(max_length=100)
     preset_code = models.CharField(max_length=50, blank=True, default='')
     client = models.ForeignKey(Client, null=True, blank=True, on_delete=models.CASCADE, related_name='invoice_templates')
@@ -93,7 +93,7 @@ class ClientInvoiceStatus(models.TextChoices):
     CANCELLED = 'CANCELLED', 'Cancelled'
     VOIDED = 'VOIDED', 'Voided'
 
-class ClientInvoice(BaseModel):
+class ClientInvoice(TenantModel):
     invoice_number = models.CharField(max_length=50, unique=True)
     client = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='invoices')
     template = models.ForeignKey(ClientInvoiceTemplate, null=True, blank=True, on_delete=models.SET_NULL, related_name='invoices')
@@ -140,7 +140,7 @@ class PaymentReceiptStatus(models.TextChoices):
     CONFIRMED = 'CONFIRMED', 'Confirmed'
     REVERSED = 'REVERSED', 'Reversed'
 
-class PaymentReceipt(BaseModel):
+class PaymentReceipt(TenantModel):
     receipt_number = models.CharField(max_length=50, unique=True)
     receipt_date = models.DateField()
     client = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='receipts')

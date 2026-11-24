@@ -85,9 +85,9 @@ class CacheManager:
         Deletes keys matching a prefix. Compatible with both Redis and LocMemCache backends.
         """
         try:
-            # 1. Native django-redis delete_pattern
+            # 1. Native django-redis delete_pattern (matches tenant-scoped org:<id>:prefix keys as well)
             if hasattr(cache, 'delete_pattern'):
-                cache.delete_pattern(f"{prefix}*")
+                cache.delete_pattern(f"*{prefix}*")
                 return
 
             # 2. Redis client via cache.client

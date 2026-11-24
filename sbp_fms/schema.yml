@@ -13021,6 +13021,11 @@ components:
           type: string
           format: date-time
           readOnly: true
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this audit entry.
         actor_user:
           type: string
           format: uuid
@@ -13208,6 +13213,11 @@ components:
           maxLength: 2
         is_active:
           type: boolean
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         gl_account:
           type: string
           format: uuid
@@ -13490,6 +13500,11 @@ components:
           nullable: true
         notes:
           type: string
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         bank_account:
           type: string
           format: uuid
@@ -13812,6 +13827,11 @@ components:
           maximum: 9223372036854775807
           minimum: 0
           format: int64
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         bank_account:
           type: string
           format: uuid
@@ -13892,6 +13912,11 @@ components:
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
         is_reconciled:
           type: boolean
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         bank_account:
           type: string
           format: uuid
@@ -14892,6 +14917,11 @@ components:
         custom_fields:
           description: Custom client-specific key-value values (e.g. po_number, cost_center,
             site_location)
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         client:
           type: string
           format: uuid
@@ -15143,6 +15173,11 @@ components:
           type: boolean
         is_active:
           type: boolean
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         client:
           type: string
           format: uuid
@@ -15304,6 +15339,11 @@ components:
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
         is_active:
           type: boolean
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         default_template:
           type: string
           format: uuid
@@ -15973,6 +16013,11 @@ components:
           format: int64
         status:
           $ref: '#/components/schemas/DepreciationRunStatusEnum'
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         journal_entry:
           type: string
           format: uuid
@@ -16133,6 +16178,11 @@ components:
         file_hash:
           type: string
           maxLength: 64
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         uploaded_by:
           type: string
           format: uuid
@@ -16396,6 +16446,11 @@ components:
         country_code:
           type: string
           maxLength: 2
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         employee:
           type: string
           format: uuid
@@ -16667,6 +16722,11 @@ components:
         country_code:
           type: string
           maxLength: 2
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         category:
           type: string
           format: uuid
@@ -16843,6 +16903,11 @@ components:
         received_date:
           type: string
           format: date
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         po:
           type: string
           format: uuid
@@ -20575,6 +20640,11 @@ components:
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
         status:
           $ref: '#/components/schemas/PaymentReceiptStatusEnum'
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         client:
           type: string
           format: uuid
@@ -20785,6 +20855,11 @@ components:
           $ref: '#/components/schemas/PaymentVoucherStatusEnum'
         rejection_reason:
           type: string
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         supplier:
           type: string
           format: uuid
@@ -20961,6 +21036,11 @@ components:
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
         status:
           $ref: '#/components/schemas/PayrollBatchStatusEnum'
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         journal_entry:
           type: string
           format: uuid
@@ -21299,6 +21379,11 @@ components:
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
         is_approved:
           type: boolean
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         supplier:
           type: string
           format: uuid
@@ -22322,6 +22407,11 @@ components:
           $ref: '#/components/schemas/MatchStatusEnum'
         discrepancy_log:
           type: string
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
         supplier:
           type: string
           format: uuid
@@ -22439,6 +22529,11 @@ components:
           pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
         is_active:
           type: boolean
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
       required:
       - created_at
       - id

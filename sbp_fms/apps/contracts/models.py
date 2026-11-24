@@ -1,6 +1,6 @@
 from decimal import Decimal
 from django.db import models
-from apps.common.models import BaseModel
+from apps.common.models import BaseModel, TenantModel
 
 
 class ContractStatus(models.TextChoices):
@@ -10,7 +10,7 @@ class ContractStatus(models.TextChoices):
     TERMINATED = 'TERMINATED', 'Terminated'
 
 
-class Contract(BaseModel):
+class Contract(TenantModel):
     contract_number = models.CharField(max_length=50, unique=True, db_index=True)
     client = models.ForeignKey('receivables.Client', on_delete=models.PROTECT, related_name='contracts')
     title = models.CharField(max_length=255)

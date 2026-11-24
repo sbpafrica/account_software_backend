@@ -1,6 +1,6 @@
 from decimal import Decimal
 from django.db import models
-from apps.common.models import BaseModel
+from apps.common.models import BaseModel, TenantModel
 from apps.ledger.models import JournalEntry
 
 class PayrollBatchStatus(models.TextChoices):
@@ -10,7 +10,7 @@ class PayrollBatchStatus(models.TextChoices):
     DISBURSED = 'DISBURSED', 'Paid Out to Workers & Tax Authorities'
     BLOCKED_SHORTFALL = 'BLOCKED_SHORTFALL', 'Disbursement Blocked (Insufficient Escrow)'
 
-class PayrollBatch(BaseModel):
+class PayrollBatch(TenantModel):
     batch_code = models.CharField(max_length=50, unique=True)
     client_id = models.UUIDField(db_index=True)
     client_name = models.CharField(max_length=255)

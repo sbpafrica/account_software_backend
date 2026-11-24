@@ -1,10 +1,10 @@
 from decimal import Decimal
 from django.db import models
 from django.conf import settings
-from apps.common.models import BaseModel
+from apps.common.models import BaseModel, TenantModel
 
 
-class InvoiceCategory(BaseModel):
+class InvoiceCategory(TenantModel):
     """
     Dynamic, Admin-managed business vertical category for invoices and billable items.
     Allows admins to add new business categories on the fly (e.g. Workforce Outsourcing,
@@ -53,7 +53,7 @@ class InvoiceLayoutStyle(models.TextChoices):
     DETAILED_STAFFING = 'DETAILED_STAFFING', 'Detailed Staffing & Timesheet'
 
 
-class InvoiceTemplate(BaseModel):
+class InvoiceTemplate(TenantModel):
     """
     Invoice Builder Template definition.
     Configures branding colors, layout styles, toggles, and dynamic header/line fields.
@@ -99,7 +99,7 @@ class InvoiceTemplate(BaseModel):
         ordering = ['-is_default', 'template_name']
 
 
-class BillableItem(BaseModel):
+class BillableItem(TenantModel):
     """
     Catalog of billable services, workforce rates, and placement fees.
     """
@@ -121,7 +121,7 @@ class BillableItem(BaseModel):
         ordering = ['code']
 
 
-class Invoice(BaseModel):
+class Invoice(TenantModel):
     """
     Comprehensive Commercial & Tax Invoice.
     Supports Standard, Pro-forma, Credit Note, and Debit Note types with multi-currency,
@@ -222,7 +222,7 @@ class RecurringScheduleStatus(models.TextChoices):
     COMPLETED = 'COMPLETED', 'Completed'
 
 
-class RecurringSchedule(BaseModel):
+class RecurringSchedule(TenantModel):
     """
     Recurring invoice profile for monthly outsourced staffing and payroll contracts.
     """
