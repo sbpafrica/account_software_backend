@@ -169,3 +169,69 @@ class IdempotencyRecord(BaseModel):
 
     def __str__(self):
         return f"IdempotencyKey {self.key} [{self.request_method} {self.request_path}] - Status: {self.response_status_code}"
+
+
+class ImportEntityType(models.TextChoices):
+    CHART_OF_ACCOUNTS = 'CHART_OF_ACCOUNTS', 'Chart of Accounts'
+    JOURNAL_ENTRY = 'JOURNAL_ENTRY', 'Opening Balances / Journal Entries'
+    FIXED_ASSET = 'FIXED_ASSET', 'Fixed Assets Register'
+    CLIENT = 'CLIENT', 'Customers & Receivables'
+    SUPPLIER = 'SUPPLIER', 'Suppliers & Payables'
+    BILLABLE_ITEM = 'BILLABLE_ITEM', 'Billable Products & Services'
+
+
+class ImportJobStatus(models.TextChoices):
+    PREVIEWED = 'PREVIEWED', 'Previewed (Dry Run)'
+    COMPLETED = 'COMPLETED', 'Successfully Imported'
+    FAILED = 'FAILED', 'Import Failed / Rejected'
+
+
+class ImportTemplate(TenantModel):
+    """
+    [CUSTOMIZABLE EXCEL IMPORT TEMPLATE]:
+    Allows tenant organizations to customize Excel import formats for accounting data.
+    Users can:
+    - Add custom columns (with custom field keys stored into metadata/notes).
+    - Rename column header names to match their legacy Excel files.
+    - Delete/disable optional columns.
+    - Set default values for missing columns.
+    - Reorder columns.
+    """
+    name = models.CharField(max_length=150, help_text="Template display name (e.g. SBP Legacy COA)")
+    entity_type = models.CharField(max_length=50, choices=ImportEntityType.choices, db_index=True)
+    description = models.TextField(blank=True, default='')
+    columns_schema = models.JSONField(
+        default=list,
+        help_text="List of column specifications: header_name, field_key, system_field, data_type, is_required, default_value, is_custom"
+    )
+    is_default = models.BooleanField(default=False, help_text="Whether this template is the tenant's primary template for this entity.")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        ordering = ['entity_type', '-is_default', 'name']
+
+    def __str__(self):
+        return f"{self.get_entity_type_display()} - {self.name}"
+
+
+class ImportJob(TenantModel):
+    """
+    Audit record of every bulk Excel upload, preview validation, and batch commit.
+    """
+    template = models.ForeignKey(ImportTemplate, null=True, blank=True, on_delete=models.SET_NULL, related_name='import_jobs')
+    entity_type = models.CharField(max_length=50, choices=ImportEntityType.choices, db_index=True)
+    file_name = models.CharField(max_length=255)
+    file_size_bytes = models.PositiveIntegerField(default=0)
+    total_rows = models.PositiveIntegerField(default=0)
+    successful_rows = models.PositiveIntegerField(default=0)
+    failed_rows = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=ImportJobStatus.choices, default=ImportJobStatus.PREVIEWED)
+    error_summary = models.JSONField(default=list, blank=True)
+    executed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"ImportJob {self.entity_type} ({self.status}) - {self.successful_rows}/{self.total_rows} rows"
+

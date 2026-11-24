@@ -1010,6 +1010,380 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedAuditLogOutputList'
           description: ''
+  /api/v1/common/imports/commit/:
+    post:
+      operationId: imports_commit
+      description: Atomically imports validated rows under active tenant workspace.
+        Flushes caches and records an audit log.
+      summary: Confirm and execute atomic batch import into database
+      tags:
+      - Imports & Excel Migration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportCommitInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImportCommitInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportCommitInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/common/imports/jobs/:
+    get:
+      operationId: imports_job_list
+      summary: List past import jobs and batch migration history
+      parameters:
+      - in: query
+        name: entity_type
+        schema:
+          type: string
+        description: Filter by entity type
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Imports & Excel Migration
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedImportJobOutputList'
+          description: ''
+  /api/v1/common/imports/preview/:
+    post:
+      operationId: imports_preview
+      description: Parses uploaded file against the template column configuration.
+        Performs schema and foreign-key checks without database mutation. Returns
+        valid rows, error diagnostics, and unmapped headers.
+      summary: Upload Excel/CSV file and preview validation (Dry Run)
+      tags:
+      - Imports & Excel Migration
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportPreviewInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImportPreviewInputRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportPreviewInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ImportPreviewOutput'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/common/imports/templates/:
+    get:
+      operationId: imports_template_list
+      summary: List customizable Excel import templates
+      parameters:
+      - in: query
+        name: entity_type
+        schema:
+          type: string
+        description: Filter by entity type (e.g. CHART_OF_ACCOUNTS, FIXED_ASSET, CLIENT,
+          SUPPLIER)
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Imports & Excel Migration
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedImportTemplateOutputList'
+          description: ''
+    post:
+      operationId: imports_template_create
+      description: Allows clients to set up custom column names, add custom columns,
+        delete optional columns, and configure defaults.
+      summary: Create or customize a new Excel import template
+      tags:
+      - Imports & Excel Migration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateCreateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateCreateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateCreateInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ImportTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/common/imports/templates/{template_id}/:
+    get:
+      operationId: imports_template_detail
+      summary: Retrieve template column mapping specifications
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Imports & Excel Migration
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ImportTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
+    put:
+      operationId: imports_template_update
+      summary: Update template column mappings (rename, add custom, delete columns)
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Imports & Excel Migration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateUpdateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateUpdateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateUpdateInputRequest'
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ImportTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
+    delete:
+      operationId: imports_template_delete
+      summary: Delete a custom import template
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Imports & Excel Migration
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/common/imports/templates/download/:
+    get:
+      operationId: imports_template_download
+      summary: Download customized Excel template (.xlsx) with sample row
+      parameters:
+      - in: query
+        name: entity_type
+        schema:
+          type: string
+        description: Entity type (e.g. FIXED_ASSET, CHART_OF_ACCOUNTS)
+      - in: query
+        name: template_id
+        schema:
+          type: string
+        description: Template UUID (optional)
+      tags:
+      - Imports & Excel Migration
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          description: Binary Excel spreadsheet (.xlsx)
+  /api/v1/common/imports/templates/reset-default/:
+    post:
+      operationId: imports_template_reset_default
+      summary: Reset template to official system standard layout
+      tags:
+      - Imports & Excel Migration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateResetDefaultInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateResetDefaultInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateResetDefaultInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ImportTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
   /api/v1/consolidation/admin/rates/:
     get:
       operationId: consolidation_admin_rates_list
@@ -16195,6 +16569,22 @@ components:
       - resource_id
       - updated_at
       - uploaded_by_email
+    EntityTypeEnum:
+      enum:
+      - CHART_OF_ACCOUNTS
+      - JOURNAL_ENTRY
+      - FIXED_ASSET
+      - CLIENT
+      - SUPPLIER
+      - BILLABLE_ITEM
+      type: string
+      description: |-
+        * `CHART_OF_ACCOUNTS` - Chart of Accounts
+        * `JOURNAL_ENTRY` - Opening Balances / Journal Entries
+        * `FIXED_ASSET` - Fixed Assets Register
+        * `CLIENT` - Customers & Receivables
+        * `SUPPLIER` - Suppliers & Payables
+        * `BILLABLE_ITEM` - Billable Products & Services
     ExchangeRateInputRequest:
       type: object
       properties:
@@ -16926,6 +17316,254 @@ components:
         received_date:
           type: string
           format: date
+    ImportCommitInputRequest:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          description: UUID returned by preview endpoint
+        validated_rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - job_id
+    ImportJobOutput:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        entity_type:
+          $ref: '#/components/schemas/EntityTypeEnum'
+        file_name:
+          type: string
+          maxLength: 255
+        file_size_bytes:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        total_rows:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        successful_rows:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        failed_rows:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        status:
+          $ref: '#/components/schemas/ImportJobOutputStatusEnum'
+        error_summary: {}
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
+        template:
+          type: string
+          format: uuid
+          nullable: true
+        executed_by:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - created_at
+      - entity_type
+      - file_name
+      - id
+      - updated_at
+    ImportJobOutputStatusEnum:
+      enum:
+      - PREVIEWED
+      - COMPLETED
+      - FAILED
+      type: string
+      description: |-
+        * `PREVIEWED` - Previewed (Dry Run)
+        * `COMPLETED` - Successfully Imported
+        * `FAILED` - Import Failed / Rejected
+    ImportPreviewInputRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Spreadsheet file (.xlsx, .xls, or .csv)
+        template_id:
+          type: string
+          format: uuid
+          nullable: true
+        entity_type:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/EntityTypeEnum'
+          - $ref: '#/components/schemas/NullEnum'
+      required:
+      - file
+    ImportPreviewOutput:
+      type: object
+      properties:
+        job_id:
+          type: string
+        template_id:
+          type: string
+        template_name:
+          type: string
+        entity_type:
+          type: string
+        file_name:
+          type: string
+        total_rows:
+          type: integer
+        valid_rows_count:
+          type: integer
+        error_rows_count:
+          type: integer
+        can_import:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        unmapped_headers:
+          type: array
+          items:
+            type: string
+        preview_rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - can_import
+      - entity_type
+      - error_rows_count
+      - errors
+      - file_name
+      - job_id
+      - preview_rows
+      - template_id
+      - template_name
+      - total_rows
+      - unmapped_headers
+      - valid_rows_count
+    ImportTemplateCreateInputRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        entity_type:
+          $ref: '#/components/schemas/EntityTypeEnum'
+        description:
+          type: string
+          default: ''
+        columns_schema:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        is_default:
+          type: boolean
+          default: false
+      required:
+      - columns_schema
+      - entity_type
+      - name
+    ImportTemplateOutput:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        organization:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tenant organization that owns this record.
+        name:
+          type: string
+          description: Template display name (e.g. SBP Legacy COA)
+          maxLength: 150
+        entity_type:
+          $ref: '#/components/schemas/EntityTypeEnum'
+        entity_type_display:
+          type: string
+          readOnly: true
+        description:
+          type: string
+        columns_schema:
+          description: 'List of column specifications: header_name, field_key, system_field,
+            data_type, is_required, default_value, is_custom'
+        columns_count:
+          type: integer
+          readOnly: true
+        is_default:
+          type: boolean
+          description: Whether this template is the tenant's primary template for
+            this entity.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - columns_count
+      - created_at
+      - entity_type
+      - entity_type_display
+      - id
+      - name
+      - updated_at
+    ImportTemplateResetDefaultInputRequest:
+      type: object
+      properties:
+        entity_type:
+          $ref: '#/components/schemas/EntityTypeEnum'
+      required:
+      - entity_type
+    ImportTemplateUpdateInputRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        description:
+          type: string
+        columns_schema:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        is_default:
+          type: boolean
     IndirectTaxCalculatorInputRequest:
       type: object
       properties:
@@ -18195,6 +18833,9 @@ components:
         * `MATCHED` - 3-Way Match Passed (Ready for Payment)
         * `BLOCKED_DISCREPANCY` - Price/Qty Discrepancy Found
         * `PAID` - Settled & Paid
+    NullEnum:
+      enum:
+      - null
     OrganizationAcceptInviteInputRequest:
       type: object
       description: Payload to accept a team invitation.
@@ -19260,6 +19901,74 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/GoodsReceivedNoteOutput'
+    PaginatedImportJobOutputList:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Data retrieved successfully.
+        pagination:
+          type: object
+          properties:
+            count:
+              type: integer
+              example: 100
+            total_pages:
+              type: integer
+              example: 2
+            current_page:
+              type: integer
+              example: 1
+            page_size:
+              type: integer
+              example: 50
+            next:
+              type: string
+              nullable: true
+            previous:
+              type: string
+              nullable: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportJobOutput'
+    PaginatedImportTemplateOutputList:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Data retrieved successfully.
+        pagination:
+          type: object
+          properties:
+            count:
+              type: integer
+              example: 100
+            total_pages:
+              type: integer
+              example: 2
+            current_page:
+              type: integer
+              example: 1
+            page_size:
+              type: integer
+              example: 50
+            next:
+              type: string
+              nullable: true
+            previous:
+              type: string
+              nullable: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportTemplateOutput'
     PaginatedInvoiceCategoryList:
       type: object
       properties:

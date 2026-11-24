@@ -1,5 +1,20 @@
 from django.contrib import admin
-from apps.common.models import AuditLog, DocumentAttachment, IdempotencyRecord
+from apps.common.models import AuditLog, DocumentAttachment, IdempotencyRecord, ImportTemplate, ImportJob
+
+
+@admin.register(ImportTemplate)
+class ImportTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'entity_type', 'organization', 'is_default', 'created_by', 'created_at')
+    list_filter = ('entity_type', 'is_default')
+    search_fields = ('name', 'description')
+
+
+@admin.register(ImportJob)
+class ImportJobAdmin(admin.ModelAdmin):
+    list_display = ('entity_type', 'file_name', 'organization', 'total_rows', 'successful_rows', 'failed_rows', 'status', 'created_at')
+    list_filter = ('entity_type', 'status')
+    search_fields = ('file_name',)
+    readonly_fields = ('organization', 'template', 'entity_type', 'file_name', 'file_size_bytes', 'total_rows', 'successful_rows', 'failed_rows', 'status', 'error_summary', 'executed_by', 'created_at')
 
 
 @admin.register(AuditLog)
