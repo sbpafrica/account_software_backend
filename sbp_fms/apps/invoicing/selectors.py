@@ -197,14 +197,14 @@ class InvoicingSelector:
         template = invoice.template or InvoiceTemplate.objects.filter(is_default=True).first()
 
         # Company profile defaults
-        company_profile = CompanyProfile.objects.filter(country_code='GH').first()
+        company_profile = CompanyProfile.objects.first()
         company_info = {
-            'name': getattr(company_profile, 'company_name', 'SBP Africa Group'),
-            'legal_name': getattr(company_profile, 'legal_name', 'SBP Africa Group Ltd'),
-            'tax_number': getattr(company_profile, 'tax_number', 'C0001234567'),
-            'email': getattr(company_profile, 'email', 'invoicing@sbp-africa.com'),
-            'phone': getattr(company_profile, 'phone', '+233 302 000 000'),
-            'address': getattr(company_profile, 'address', 'Airport Residential Area, Accra, Ghana'),
+            'name': (getattr(company_profile, 'company_name', '') or 'SBP Africa Group'),
+            'legal_name': (getattr(company_profile, 'company_name', '') or 'SBP Africa Group Ltd'),
+            'tax_number': (getattr(company_profile, 'tax_identification_number', '') or 'C0001234567'),
+            'email': (getattr(company_profile, 'email', '') or 'invoicing@sbp-africa.com'),
+            'phone': (getattr(company_profile, 'telephone', '') or '+233 302 000 000'),
+            'address': (getattr(company_profile, 'business_address', '') or 'Airport Residential Area, Accra, Ghana'),
             'logo_url': getattr(company_profile, 'logo_url', ''),
         }
 

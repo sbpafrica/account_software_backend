@@ -472,11 +472,40 @@ class TestReceivablesPaystackPayment:
         res_bad = api_client.post(inv_url, bad_payload, format="json")
         assert res_bad.status_code == status.HTTP_400_BAD_REQUEST
 
-        # 6. Test Full Rendered Invoice Data API
+        # 6. Test Full Rendered Invoice Data API (with CompanyProfile and BankAccount present)
+        from apps.ledger.models import Account, AccountType, CompanyProfile
+        from apps.treasury.models import BankAccount
+        CompanyProfile.objects.create(
+            company_name="SBP Africa Ltd",
+            business_address="14 Liberation Road, Accra",
+            telephone="+233 30 200 1234",
+            email="billing@sbpafrica.group",
+            tax_identification_number="C0099887766",
+        )
+        bank_gl = Account.objects.create(
+            code="1025",
+            name="Ecobank Corporate",
+            account_type=AccountType.ASSET,
+            currency="GHS",
+        )
+        BankAccount.objects.create(
+            bank_name="Ecobank Ghana",
+            account_number="0123456789",
+            branch_name="Ridge",
+            swift_code="ECOCGHAC",
+            currency="GHS",
+            gl_account=bank_gl,
+            is_active=True,
+        )
+
         render_url = reverse("client-invoice-render-admin", kwargs={"invoice_id": inv_id})
         res_render = api_client.get(render_url)
         assert res_render.status_code == status.HTTP_200_OK
         render_data = res_render.data["data"]
+        assert render_data["company"]["address"] == "14 Liberation Road, Accra"
+        assert render_data["company"]["phone"] == "+233 30 200 1234"
+        assert render_data["company"]["email"] == "billing@sbpafrica.group"
+        assert render_data["bank_accounts"][0]["swift_code"] == "ECOCGHAC"
         assert render_data["template"]["layout_style"] == "DETAILED_STAFFING"
         assert render_data["client"]["name"] == "Ashanti Gold Mining Consortium"
         assert any(f["key"] == "po_number" and f["value"] == "PO-AGMC-2026-0042" for f in render_data["invoice"]["header_custom_fields"])

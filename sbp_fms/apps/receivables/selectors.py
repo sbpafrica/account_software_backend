@@ -330,14 +330,15 @@ def client_invoice_render_data(*, invoice_id) -> dict:
         })
 
     company = CompanyProfile.objects.first()
+    company_name = company.company_name if company else "SBP Africa Group"
     company_data = {
-        'company_name': company.company_name if company else "SBP Africa Group",
+        'company_name': company_name,
         'registration_number': company.registration_number if company else "",
-        'tax_id': company.tax_identification_number if company else "C0019283921",
-        'email': "finance@sbp-africa.com",
-        'phone': "+233 30 291 0293",
-        'address': company.registered_address if company else "Heritage Tower, Ridge, Accra, Ghana",
-        'country_code': inv.client.country_code or 'GH'
+        'tax_id': (company.tax_identification_number or "C0019283921") if company else "C0019283921",
+        'email': (company.email or "finance@sbp-africa.com") if company else "finance@sbp-africa.com",
+        'phone': (company.telephone or "+233 30 291 0293") if company else "+233 30 291 0293",
+        'address': (company.business_address or "Heritage Tower, Ridge, Accra, Ghana") if company else "Heritage Tower, Ridge, Accra, Ghana",
+        'country_code': inv.client.country_code or (company.country_code if company else 'GH')
     }
 
     bank_accounts = []
@@ -345,10 +346,10 @@ def client_invoice_render_data(*, invoice_id) -> dict:
         for b in BankAccount.objects.filter(is_active=True)[:2]:
             bank_accounts.append({
                 'bank_name': b.bank_name,
-                'account_name': b.account_name,
+                'account_name': getattr(b, 'account_name', company_name),
                 'account_number': b.account_number,
                 'currency': b.currency,
-                'swift_code': b.swift_bic,
+                'swift_code': b.swift_code,
                 'branch': b.branch_name
             })
 
