@@ -5,7 +5,7 @@ from apps.ledger.models import Account, AccountType
 from apps.assets.models import FixedAsset, AssetCategory
 from apps.receivables.models import Client
 from apps.payables.models import Supplier
-from apps.invoicing.models import BillableItem
+from apps.invoicing.models import BillableItem, Invoice, InvoiceType
 
 
 def validate_import_rows(*, entity_type: str, parsed_rows: list[dict], organization) -> tuple[list[dict], list[dict]]:
@@ -229,6 +229,60 @@ def validate_import_rows(*, entity_type: str, parsed_rows: list[dict], organizat
 
             if price is None or Decimal(str(price)) < Decimal('0.00'):
                 row_errors.append({"row": r_num, "column": "Unit Price", "error": "Unit Price must be zero or a positive number."})
+
+            if row_errors:
+                errors.extend(row_errors)
+            else:
+                valid_rows.append(row)
+
+    elif entity_type == ImportEntityType.INVOICE:
+        clients_qs = Client.objects.filter(organization=organization) if organization else Client.objects.all()
+        client_by_code = {c.code.strip().lower(): c for c in clients_qs if c.code}
+        client_by_name = {c.name.strip().lower(): c for c in clients_qs if c.name}
+        existing_inv_nums = set(
+            Invoice.objects.filter(organization=organization).values_list('invoice_number', flat=True)
+            if organization else Invoice.objects.values_list('invoice_number', flat=True)
+        )
+
+        for row in parsed_rows:
+            r_num = row["row_number"]
+            f = row["fields"]
+            inv_num = str(f.get("invoice_number") or "").strip()
+            client_ref = str(f.get("client_code") or "").strip()
+            issue_dt = f.get("issue_date")
+            due_dt = f.get("due_date")
+            inv_type = str(f.get("invoice_type") or "STANDARD").strip().upper()
+            line_desc = str(f.get("line_description") or "").strip()
+            qty = f.get("quantity")
+            unit_price = f.get("unit_price")
+
+            row_errors = []
+            if inv_num and inv_num in existing_inv_nums:
+                row_errors.append({"row": r_num, "column": "Invoice Number", "error": f"Invoice '{inv_num}' already exists."})
+
+            if not client_ref:
+                row_errors.append({"row": r_num, "column": "Client Code or Name", "error": "Client Code or Name is required."})
+            elif client_ref.lower() not in client_by_code and client_ref.lower() not in client_by_name:
+                row_errors.append({"row": r_num, "column": "Client Code or Name", "error": f"Client '{client_ref}' not found in organization."})
+
+            if not issue_dt:
+                row_errors.append({"row": r_num, "column": "Issue Date", "error": "Issue Date is required (YYYY-MM-DD)."})
+            if not due_dt:
+                row_errors.append({"row": r_num, "column": "Due Date", "error": "Due Date is required (YYYY-MM-DD)."})
+            if issue_dt and due_dt and due_dt < issue_dt:
+                row_errors.append({"row": r_num, "column": "Due Date", "error": "Due Date cannot be earlier than Issue Date."})
+
+            if inv_type not in InvoiceType.values:
+                row_errors.append({"row": r_num, "column": "Invoice Type", "error": f"Invalid Invoice Type '{inv_type}'."})
+
+            if not line_desc:
+                row_errors.append({"row": r_num, "column": "Line Description", "error": "Line Description is required."})
+
+            if qty is None or Decimal(str(qty)) <= Decimal('0'):
+                row_errors.append({"row": r_num, "column": "Quantity", "error": "Quantity must be greater than 0."})
+
+            if unit_price is None or Decimal(str(unit_price)) < Decimal('0'):
+                row_errors.append({"row": r_num, "column": "Unit Price", "error": "Unit Price must be 0 or greater."})
 
             if row_errors:
                 errors.extend(row_errors)

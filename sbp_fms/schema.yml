@@ -2039,6 +2039,399 @@ paths:
                 - success
                 - message
           description: ''
+  /api/v1/invoicing/excel/commit/:
+    post:
+      operationId: invoicing_excel_commit
+      summary: Commit previewed invoice Excel upload into database
+      tags:
+      - Invoicing - Excel Import & Export
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportCommitInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/excel/export/:
+    get:
+      operationId: invoicing_excel_export
+      description: Exports invoices matching the optional filters into an .xlsx workbook
+        formatted according to the specified or default INVOICE Excel template.
+      summary: Download existing invoices as Excel (.xlsx) using custom headers
+      parameters:
+      - in: query
+        name: category_id
+        schema:
+          type: string
+        description: Filter by category UUID
+      - in: query
+        name: client_id
+        schema:
+          type: string
+        description: Filter by client UUID
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Filter issue_date <= YYYY-MM-DD
+      - in: query
+        name: invoice_type
+        schema:
+          type: string
+        description: Filter by invoice type
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search by invoice number, PO reference, or client
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Filter issue_date >= YYYY-MM-DD
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Filter by invoice status
+      - in: query
+        name: template_id
+        schema:
+          type: string
+        description: Optional custom ImportTemplate UUID to control Excel headers
+          & column order
+      tags:
+      - Invoicing - Excel Import & Export
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: string
+                    format: binary
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/excel/preview/:
+    post:
+      operationId: invoicing_excel_preview
+      summary: Upload invoice Excel (.xlsx) and preview validated rows
+      tags:
+      - Invoicing - Excel Import & Export
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportPreviewInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImportPreviewInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ImportPreviewOutput'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/excel/template/download/:
+    get:
+      operationId: invoicing_excel_template_download
+      summary: Download customized Excel (.xlsx) template for uploading invoices
+      parameters:
+      - in: query
+        name: template_id
+        schema:
+          type: string
+        description: Optional custom ImportTemplate UUID
+      tags:
+      - Invoicing - Excel Import & Export
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: string
+                    format: binary
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/excel/templates/:
+    get:
+      operationId: invoicing_excel_template_list
+      summary: List invoice Excel header templates
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Invoicing - Excel Import & Export
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedImportTemplateOutputList'
+          description: ''
+    post:
+      operationId: invoicing_excel_template_create
+      description: Allows users to customize Excel column headers, add custom columns,
+        remove optional columns, and reorder columns for invoice import/export.
+      summary: Create custom Excel header setup for invoices
+      tags:
+      - Invoicing - Excel Import & Export
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceExcelTemplateCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceExcelTemplateCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceExcelTemplateCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ImportTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/excel/templates/{template_id}/:
+    get:
+      operationId: invoicing_excel_template_detail
+      summary: Retrieve invoice Excel header template
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Excel Import & Export
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ImportTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
+    put:
+      operationId: invoicing_excel_template_update
+      summary: Update invoice Excel header setup (rename, add, delete, reorder columns)
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Excel Import & Export
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateUpdateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateUpdateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportTemplateUpdateInputRequest'
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ImportTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
+    delete:
+      operationId: invoicing_excel_template_delete
+      summary: Delete custom invoice Excel template
+      parameters:
+      - in: path
+        name: template_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Invoicing - Excel Import & Export
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: object
+                    additionalProperties: {}
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/excel/templates/reset-default/:
+    post:
+      operationId: invoicing_excel_template_reset
+      summary: Reset invoice Excel headers to system default
+      tags:
+      - Invoicing - Excel Import & Export
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    $ref: '#/components/schemas/ImportTemplateOutput'
+                required:
+                - success
+                - message
+          description: ''
   /api/v1/invoicing/invoices/:
     get:
       operationId: admin_invoicing_invoice_list
@@ -2394,6 +2787,79 @@ paths:
                     example: Operation completed successfully.
                   data:
                     $ref: '#/components/schemas/InvoiceDetail'
+                required:
+                - success
+                - message
+          description: ''
+  /api/v1/invoicing/invoices/export/:
+    get:
+      operationId: invoicing_excel_export_2
+      description: Exports invoices matching the optional filters into an .xlsx workbook
+        formatted according to the specified or default INVOICE Excel template.
+      summary: Download existing invoices as Excel (.xlsx) using custom headers
+      parameters:
+      - in: query
+        name: category_id
+        schema:
+          type: string
+        description: Filter by category UUID
+      - in: query
+        name: client_id
+        schema:
+          type: string
+        description: Filter by client UUID
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Filter issue_date <= YYYY-MM-DD
+      - in: query
+        name: invoice_type
+        schema:
+          type: string
+        description: Filter by invoice type
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search by invoice number, PO reference, or client
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Filter issue_date >= YYYY-MM-DD
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Filter by invoice status
+      - in: query
+        name: template_id
+        schema:
+          type: string
+        description: Optional custom ImportTemplate UUID to control Excel headers
+          & column order
+      tags:
+      - Invoicing - Excel Import & Export
+      security:
+      - jwtAuth: []
+      - sbpTokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Operation completed successfully.
+                  data:
+                    type: string
+                    format: binary
                 required:
                 - success
                 - message
@@ -16794,6 +17260,7 @@ components:
       - CLIENT
       - SUPPLIER
       - BILLABLE_ITEM
+      - INVOICE
       type: string
       description: |-
         * `CHART_OF_ACCOUNTS` - Chart of Accounts
@@ -16802,6 +17269,7 @@ components:
         * `CLIENT` - Customers & Receivables
         * `SUPPLIER` - Suppliers & Payables
         * `BILLABLE_ITEM` - Billable Products & Services
+        * `INVOICE` - Commercial & Tax Invoices
     ExchangeRateInputRequest:
       type: object
       properties:
@@ -18171,6 +18639,27 @@ components:
       - tax_lines
       - template_name
       - updated_at
+    InvoiceExcelTemplateCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        description:
+          type: string
+          default: ''
+        columns_schema:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        is_default:
+          type: boolean
+          default: false
+      required:
+      - columns_schema
+      - name
     InvoiceLine:
       type: object
       properties:

@@ -178,6 +178,7 @@ class ImportEntityType(models.TextChoices):
     CLIENT = 'CLIENT', 'Customers & Receivables'
     SUPPLIER = 'SUPPLIER', 'Suppliers & Payables'
     BILLABLE_ITEM = 'BILLABLE_ITEM', 'Billable Products & Services'
+    INVOICE = 'INVOICE', 'Commercial & Tax Invoices'
 
 
 class ImportJobStatus(models.TextChoices):

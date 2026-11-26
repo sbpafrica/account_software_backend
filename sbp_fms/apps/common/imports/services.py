@@ -17,7 +17,8 @@ from apps.ledger.models import Account, AccountType, JournalEntry, JournalLine, 
 from apps.assets.models import FixedAsset, AssetCategory, AssetStatus, DepreciationMethod
 from apps.receivables.models import Client
 from apps.payables.models import Supplier
-from apps.invoicing.models import BillableItem
+from apps.invoicing.models import BillableItem, InvoiceType
+from apps.invoicing.services import InvoicingService
 
 
 class ImportService:
@@ -541,6 +542,76 @@ class ImportService:
                 )
                 imported_count += 1
             CacheManager.delete_pattern("fms:invoicing:*")
+
+        elif entity_type == ImportEntityType.INVOICE:
+            clients_qs = Client.objects.filter(organization=organization) if organization else Client.objects.all()
+            client_by_code = {c.code.strip().lower(): c for c in clients_qs if c.code}
+            client_by_name = {c.name.strip().lower(): c for c in clients_qs if c.name}
+
+            # Group rows sharing an invoice_number into multi-line invoices;
+            # rows without an invoice_number become individual invoices.
+            grouped_invoices = []
+            by_number = {}
+            for r in validated_rows:
+                f = r["fields"]
+                inv_num = str(f.get("invoice_number") or "").strip()
+                if inv_num:
+                    if inv_num not in by_number:
+                        by_number[inv_num] = []
+                        grouped_invoices.append((inv_num, by_number[inv_num]))
+                    by_number[inv_num].append(r)
+                else:
+                    grouped_invoices.append((None, [r]))
+
+            for inv_num, group_rows in grouped_invoices:
+                head = group_rows[0]["fields"]
+                client_ref = str(head.get("client_code") or "").strip().lower()
+                client = client_by_code.get(client_ref) or client_by_name.get(client_ref)
+                issue_dt = head.get("issue_date")
+                due_dt = head.get("due_date")
+                if isinstance(issue_dt, str):
+                    issue_dt = datetime.date.fromisoformat(issue_dt)
+                if isinstance(due_dt, str):
+                    due_dt = datetime.date.fromisoformat(due_dt)
+
+                inv_type = str(head.get("invoice_type") or InvoiceType.STANDARD).strip().upper()
+                currency = str(head.get("currency") or "GHS").strip().upper()
+                ref_num = str(head.get("reference_number") or "").strip()
+                notes = str(head.get("notes") or "").strip()
+                header_custom = group_rows[0].get("extra_data") or {}
+
+                lines_payload = []
+                for gr in group_rows:
+                    gf = gr["fields"]
+                    tax_code = str(gf.get("tax_code") or "VAT_STANDARD").strip().upper()
+                    tax_rate = Decimal("0.1500") if tax_code == "VAT_STANDARD" else Decimal("0.0000")
+                    lines_payload.append({
+                        "description": str(gf.get("line_description") or "").strip(),
+                        "quantity": Decimal(str(gf.get("quantity") or 1)),
+                        "unit_of_measurement": str(gf.get("unit_of_measurement") or "Unit").strip(),
+                        "unit_price": Decimal(str(gf.get("unit_price") or 0)),
+                        "discount_amount": Decimal(str(gf.get("discount_amount") or 0)),
+                        "tax_code": tax_code,
+                        "tax_rate": tax_rate,
+                        "custom_fields": gr.get("extra_data") or {},
+                    })
+
+                InvoicingService.invoice_create(
+                    client_id=str(client.id),
+                    issue_date=issue_dt,
+                    due_date=due_dt,
+                    invoice_type=inv_type,
+                    currency=currency,
+                    reference_number=ref_num,
+                    invoice_number=inv_num or None,
+                    lines=lines_payload,
+                    custom_fields=header_custom,
+                    notes=notes,
+                    auto_calculate_tax=True,
+                    user=user,
+                )
+                imported_count += 1
+            CacheManager.invalidate_invoicing()
 
         # Mark job completed
         job.status = ImportJobStatus.COMPLETED

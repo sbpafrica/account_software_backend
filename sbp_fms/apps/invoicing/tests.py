@@ -479,3 +479,95 @@ class TestInvoicingAPIEndpoints:
         assert res_render.data['data']['total_amount'] == 36570.00
         assert len(res_render.data['data']['tax_lines']) == 4
         assert res_render.data['data']['banking'] is not None
+
+
+@pytest.mark.django_db
+class TestInvoicingExcelImportAndExport:
+    def test_custom_excel_headers_upload_and_export(self, setup_data):
+        import io
+        import openpyxl
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        client = setup_data['client']
+        user = setup_data['user']
+        api_client = APIClient()
+        api_client.force_authenticate(user=user)
+
+        # 1. Create custom Excel header setup for invoices
+        custom_schema = [
+            {"header_name": "Inv Ref", "field_key": "invoice_number", "system_field": "invoice_number", "data_type": "string", "is_required": False, "is_custom": False},
+            {"header_name": "Customer ID", "field_key": "client_code", "system_field": "client_code", "data_type": "string", "is_required": True, "is_custom": False},
+            {"header_name": "Bill Date", "field_key": "issue_date", "system_field": "issue_date", "data_type": "date", "is_required": True, "is_custom": False},
+            {"header_name": "Pay By", "field_key": "due_date", "system_field": "due_date", "data_type": "date", "is_required": True, "is_custom": False},
+            {"header_name": "Service Details", "field_key": "line_description", "system_field": "line_description", "data_type": "string", "is_required": True, "is_custom": False},
+            {"header_name": "Qty", "field_key": "quantity", "system_field": "quantity", "data_type": "number", "is_required": True, "is_custom": False},
+            {"header_name": "Rate", "field_key": "unit_price", "system_field": "unit_price", "data_type": "number", "is_required": True, "is_custom": False},
+            {"header_name": "Mine Site", "field_key": "site_name", "system_field": "", "data_type": "string", "is_required": False, "is_custom": True},
+        ]
+        res_tpl = api_client.post('/api/v1/invoicing/excel/templates/', {
+            'name': 'Custom Mining Invoice Sheet',
+            'columns_schema': custom_schema,
+            'is_default': True,
+        }, format='json')
+        assert res_tpl.status_code == 201
+        tpl_id = res_tpl.data['data']['id']
+
+        # 2. Download customized Excel template and verify custom headers
+        res_dl = api_client.get(f'/api/v1/invoicing/excel/template/download/?template_id={tpl_id}')
+        assert res_dl.status_code == 200
+        wb_tpl = openpyxl.load_workbook(io.BytesIO(res_dl.content))
+        ws_tpl = wb_tpl.active
+        headers = [ws_tpl.cell(row=1, column=c).value for c in range(1, 9)]
+        assert headers[0] == "Inv Ref"
+        assert headers[1] == "Customer ID *"
+        assert headers[4] == "Service Details *"
+        assert headers[7] == "Mine Site"
+
+        # 3. Build Excel upload with 2 lines sharing INV-XLS-001
+        wb_up = openpyxl.Workbook()
+        ws_up = wb_up.active
+        ws_up.append(["Inv Ref", "Customer ID", "Bill Date", "Pay By", "Service Details", "Qty", "Rate", "Mine Site"])
+        ws_up.append(["INV-XLS-001", client.code, "2026-11-26", "2026-12-26", "Rig Maintenance", 10, 500, "Tarkwa"])
+        ws_up.append(["INV-XLS-001", client.code, "2026-11-26", "2026-12-26", "Safety Audit", 2, 1000, "Tarkwa"])
+        buf_up = io.BytesIO()
+        wb_up.save(buf_up)
+        buf_up.seek(0)
+
+        upload = SimpleUploadedFile(
+            "invoices_batch.xlsx",
+            buf_up.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        res_prev = api_client.post('/api/v1/invoicing/excel/preview/', {
+            'file': upload,
+            'template_id': tpl_id,
+        }, format='multipart')
+        assert res_prev.status_code == 200
+        prev_data = res_prev.data['data']
+        assert prev_data['valid_rows_count'] == 2
+        assert prev_data['error_rows_count'] == 0
+
+        # 4. Commit import job
+        res_commit = api_client.post('/api/v1/invoicing/excel/commit/', {
+            'job_id': prev_data['job_id'],
+            'validated_rows': prev_data['_validated_data'],
+        }, format='json')
+        assert res_commit.status_code == 201
+        assert res_commit.data['data']['imported_count'] == 1
+
+        inv = Invoice.objects.get(invoice_number="INV-XLS-001")
+        assert inv.lines.count() == 2
+        assert inv.subtotal == Decimal('7000.0000')
+        assert inv.custom_fields.get('site_name') == 'Tarkwa'
+
+        # 5. Export invoices using custom Excel headers
+        res_exp = api_client.get(f'/api/v1/invoicing/invoices/export/?template_id={tpl_id}')
+        assert res_exp.status_code == 200
+        wb_exp = openpyxl.load_workbook(io.BytesIO(res_exp.content))
+        ws_exp = wb_exp.active
+        exp_headers = [ws_exp.cell(row=1, column=c).value for c in range(1, 9)]
+        assert exp_headers == ["Inv Ref", "Customer ID", "Bill Date", "Pay By", "Service Details", "Qty", "Rate", "Mine Site"]
+        assert ws_exp.cell(row=2, column=1).value == "INV-XLS-001"
+        assert ws_exp.cell(row=2, column=5).value == "Rig Maintenance"
+        assert ws_exp.cell(row=2, column=8).value == "Tarkwa"
+        assert ws_exp.cell(row=3, column=5).value == "Safety Audit"
