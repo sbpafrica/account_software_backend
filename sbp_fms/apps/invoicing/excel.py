@@ -39,6 +39,14 @@ def _resolve_invoice_cell_value(inv, line, col: dict):
         return float(inv.amount_paid)
     if key == "balance_due":
         return float(inv.balance_due)
+    if key == "hr_cost":
+        if line is not None and (line.custom_fields or {}).get("_line_type") == "HR_COST":
+            return float(line.line_total)
+        return 0.0
+    if key == "service_charge":
+        if line is not None and (line.custom_fields or {}).get("_line_type") in ("SERVICE_FEE", "BUS_SHUTTLE"):
+            return float(line.line_total)
+        return 0.0
 
     if line is not None:
         if key == "line_type":

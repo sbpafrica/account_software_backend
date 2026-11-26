@@ -610,3 +610,81 @@ class TestInvoicingExcelImportAndExport:
         credits_by_acct = {jl.account.code: jl.credit for jl in je_lines if jl.credit > 0}
         assert credits_by_acct.get("4010-REVENUE-GH") == Decimal("1000.0000")
         assert credits_by_acct.get("4020-SHUTTLE-REVENUE-GH") == Decimal("500.0000")
+
+    def test_income_2025_excel_direct_upload(self, setup_data):
+        """
+        Verifies that the exact INCOME_2025.xlsx format (Row 1 banner, Row 2 headers,
+        HR COST + SERVICE CHARGE on one row, trailing 0s & SUMMARY block) uploads
+        directly using the Default Commercial & Tax Invoices Template.
+        """
+        import io
+        import openpyxl
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        client = setup_data['client']
+        user = setup_data['user']
+        api_client = APIClient()
+        api_client.force_authenticate(user=user)
+
+        # Reset/fetch default template (should use INCOME_2025 headers)
+        res_list = api_client.get('/api/v1/invoicing/excel/templates/')
+        assert res_list.status_code == 200
+        tpl_id = res_list.data['data'][0]['id']
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        # Row 1: Group banner (just like INCOME_2025.xlsx)
+        ws.append(["S/N", "DATE", "COMPANY NAME", None, None, "HR COST", None, None, None, "SERVICE FEES"])
+        # Row 2: Real column headers
+        ws.append([
+            "S/N", "ISSUANCE DATE", "CLIENT'S NAME", "INVOICE NO", "NO. OF EE",
+            "HR COST", "SERVICE CHARGE", "7.5%WHT", "NET", "GETFUND (2.5)",
+            "NHIL (2.5%)", "COVID (1%)", "CBV", "VAT (15%)", "SUB TOTAL", "TOTAL"
+        ])
+        # Row 3: Real invoice row (HR COST + SERVICE CHARGE on same row)
+        ws.append([
+            1, "2025-01-22", client.name, "NS250207-001-000003", 73,
+            79873.00, 1873.00, 140.475, 1732.525, 46.825,
+            46.825, 18.73, 1985.38, 297.807, 2283.187, 2142.712
+        ])
+        # Trailing 0 row + monthly total + SUMMARY rows (must be skipped cleanly)
+        ws.append([None, None, None, None, None, None, None, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        ws.append([None, None, None, None, None, 79873.00, 1873.00])
+        ws.append([None, None, None, None, None, None, None, "SUMMARY"])
+        ws.append([None, None, None, None, None, None, None, None, "VAT", 297.807])
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        upload = SimpleUploadedFile(
+            "INCOME_2025.xlsx",
+            buf.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        res_prev = api_client.post('/api/v1/invoicing/excel/preview/', {
+            'file': upload,
+            'template_id': tpl_id,
+        }, format='multipart')
+        assert res_prev.status_code == 200
+        prev_data = res_prev.data['data']
+        assert prev_data['error_rows_count'] == 0
+        assert prev_data['valid_rows_count'] == 1
+
+        res_commit = api_client.post('/api/v1/invoicing/excel/commit/', {
+            'job_id': prev_data['job_id'],
+            'validated_rows': prev_data['_validated_data'],
+        }, format='json')
+        assert res_commit.status_code == 201
+        assert res_commit.data['data']['imported_count'] == 1
+
+        inv = Invoice.objects.get(invoice_number="NS250207-001-000003")
+        assert inv.lines.count() == 2
+        assert inv.subtotal == Decimal('81746.0000')
+        assert inv.due_date == datetime.date(2025, 2, 21)
+        lines_by_type = {l.custom_fields.get('_line_type'): l for l in inv.lines.all()}
+        assert lines_by_type['HR_COST'].tax_code == 'EXEMPT'
+        assert lines_by_type['HR_COST'].unit_price == Decimal('79873.0000')
+        assert lines_by_type['HR_COST'].custom_fields.get('no_of_employees') == 73
+        assert lines_by_type['SERVICE_FEE'].tax_code == 'VAT_STANDARD'
+        assert lines_by_type['SERVICE_FEE'].unit_price == Decimal('1873.0000')

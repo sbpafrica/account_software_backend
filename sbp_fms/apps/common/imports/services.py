@@ -545,20 +545,14 @@ class ImportService:
 
         elif entity_type == ImportEntityType.INVOICE:
             clients_qs = Client.objects.filter(organization=organization) if organization else Client.objects.all()
-            client_by_code = {c.code.strip().lower(): c for c in clients_qs if c.code}
-            client_by_name = {c.name.strip().lower(): c for c in clients_qs if c.name}
+            client_by_code = {" ".join(c.code.split()).lower(): c for c in clients_qs if c.code}
+            client_by_name = {" ".join(c.name.split()).lower(): c for c in clients_qs if c.name}
 
-            # LINE TYPE → TAX CODE rules (matches INCOME_2025.xlsx logic)
-            # HR_COST lines: manpower pass-through → EXEMPT (no Ghana indirect tax on the HR cost itself)
-            # SERVICE_FEE lines: management/service charge → VAT_STANDARD (NHIL+GETFund+COVID+VAT cascade)
-            # BUS_SHUTTLE lines: transport revenue → VAT_STANDARD, posted to 4020-SHUTTLE-REVENUE-GH
-            # OTHER: honour the row's Tax Code column directly
             LINE_TYPE_TAX_CODE = {
                 "HR_COST": "EXEMPT",
                 "SERVICE_FEE": "VAT_STANDARD",
                 "BUS_SHUTTLE": "VAT_STANDARD",
             }
-            # Revenue GL account overrides by line type
             LINE_TYPE_REVENUE_ACCOUNT = {
                 "BUS_SHUTTLE": "4020-SHUTTLE-REVENUE-GH",
             }
@@ -580,63 +574,111 @@ class ImportService:
 
             for inv_num, group_rows in grouped_invoices:
                 head = group_rows[0]["fields"]
-                client_ref = str(head.get("client_code") or "").strip().lower()
+                head_extra = group_rows[0].get("extra_data") or {}
+                client_ref = " ".join(str(head.get("client_code") or "").split()).lower()
                 client = client_by_code.get(client_ref) or client_by_name.get(client_ref)
                 issue_dt = head.get("issue_date")
                 due_dt = head.get("due_date")
                 if isinstance(issue_dt, str):
                     issue_dt = datetime.date.fromisoformat(issue_dt)
-                if isinstance(due_dt, str):
+                if not due_dt:
+                    due_dt = issue_dt + datetime.timedelta(days=30)
+                elif isinstance(due_dt, str):
                     due_dt = datetime.date.fromisoformat(due_dt)
 
                 inv_type = str(head.get("invoice_type") or InvoiceType.STANDARD).strip().upper()
                 currency = str(head.get("currency") or "GHS").strip().upper()
                 ref_num = str(head.get("reference_number") or "").strip()
                 notes = str(head.get("notes") or "").strip()
-                header_custom = group_rows[0].get("extra_data") or {}
+                header_custom = dict(head_extra)
 
                 lines_payload = []
                 for gr in group_rows:
                     gf = gr["fields"]
+                    ge = gr.get("extra_data") or {}
+                    billing_month = str(ge.get("billing_month") or gf.get("billing_month") or "").strip()
+                    no_of_ee = ge.get("no_of_employees") if ge.get("no_of_employees") is not None else gf.get("no_of_employees")
+                    ee_int = None
+                    if no_of_ee is not None and str(no_of_ee).strip() not in ("", "0", "None", "-"):
+                        try:
+                            ee_int = int(Decimal(str(no_of_ee)))
+                        except Exception:
+                            ee_int = None
 
-                    # Resolve line_type (from INCOME_2025 column layout)
-                    line_type = str(gf.get("line_type") or "OTHER").strip().upper()
+                    hr_cost = Decimal(str(gf.get("hr_cost") or 0))
+                    service_charge = Decimal(str(gf.get("service_charge") or 0))
 
-                    # Tax code: LINE_TYPE takes priority, then explicit Tax Code column
-                    if line_type in LINE_TYPE_TAX_CODE:
-                        tax_code = LINE_TYPE_TAX_CODE[line_type]
+                    if hr_cost > Decimal("0") or service_charge > Decimal("0"):
+                        # Wide INCOME_2025.xlsx row: expand into HR_COST (exempt) + SERVICE_FEE / BUS_SHUTTLE (taxable)
+                        period_suffix = f" ({billing_month})" if billing_month else ""
+                        if hr_cost > Decimal("0"):
+                            hr_cf = dict(ge)
+                            hr_cf["_line_type"] = "HR_COST"
+                            if ee_int is not None:
+                                hr_cf["no_of_employees"] = ee_int
+                            lines_payload.append({
+                                "description": f"HR & Manpower Cost{period_suffix}",
+                                "quantity": Decimal("1"),
+                                "unit_of_measurement": "Month",
+                                "unit_price": hr_cost,
+                                "discount_amount": Decimal("0.00"),
+                                "tax_code": "EXEMPT",
+                                "tax_rate": Decimal("0.0000"),
+                                "custom_fields": hr_cf,
+                            })
+                        if service_charge > Decimal("0"):
+                            is_shuttle = ("bus" in client_ref or "shuttle" in client_ref) and hr_cost == Decimal("0")
+                            svc_type = "BUS_SHUTTLE" if is_shuttle else "SERVICE_FEE"
+                            svc_cf = dict(ge)
+                            svc_cf["_line_type"] = svc_type
+                            if ee_int is not None:
+                                svc_cf["no_of_employees"] = ee_int
+                            svc_line = {
+                                "description": (
+                                    f"Bus Shuttle Services{period_suffix}"
+                                    if is_shuttle else f"Management & Service Fee{period_suffix}"
+                                ),
+                                "quantity": Decimal("1"),
+                                "unit_of_measurement": "Month",
+                                "unit_price": service_charge,
+                                "discount_amount": Decimal("0.00"),
+                                "tax_code": "VAT_STANDARD",
+                                "tax_rate": Decimal("0.1500"),
+                                "custom_fields": svc_cf,
+                            }
+                            if is_shuttle:
+                                svc_line["revenue_account_code"] = "4020-SHUTTLE-REVENUE-GH"
+                            lines_payload.append(svc_line)
                     else:
-                        tax_code = str(gf.get("tax_code") or "VAT_STANDARD").strip().upper()
-                        if tax_code not in ("VAT_STANDARD", "EXEMPT", "ZERO"):
-                            tax_code = "VAT_STANDARD"
+                        # Normalized single-line-per-row format
+                        line_type = str(gf.get("line_type") or "OTHER").strip().upper()
+                        if line_type in LINE_TYPE_TAX_CODE:
+                            tax_code = LINE_TYPE_TAX_CODE[line_type]
+                        else:
+                            tax_code = str(gf.get("tax_code") or "VAT_STANDARD").strip().upper()
+                            if tax_code not in ("VAT_STANDARD", "EXEMPT", "ZERO"):
+                                tax_code = "VAT_STANDARD"
 
-                    tax_rate = Decimal("0.1500") if tax_code == "VAT_STANDARD" else Decimal("0.0000")
+                        tax_rate = Decimal("0.1500") if tax_code == "VAT_STANDARD" else Decimal("0.0000")
+                        line_cf = dict(ge)
+                        line_cf["_line_type"] = line_type
+                        if ee_int is not None:
+                            line_cf["no_of_employees"] = ee_int
 
-                    # Build custom_fields: merge no_of_employees + any extra_data columns
-                    # Store _line_type so the GL posting (invoice_approve) can split revenue accounts
-                    line_cf = dict(gr.get("extra_data") or {})
-                    line_cf["_line_type"] = line_type
-                    no_of_ee = gf.get("no_of_employees")
-                    if no_of_ee is not None and str(no_of_ee).strip() not in ("", "0", "None"):
-                        line_cf["no_of_employees"] = int(Decimal(str(no_of_ee)))
-
-                    # Revenue account override for special line types (e.g. Bus Shuttle)
-                    revenue_account_code = LINE_TYPE_REVENUE_ACCOUNT.get(line_type)
-
-                    line_entry = {
-                        "description": str(gf.get("line_description") or "").strip(),
-                        "quantity": Decimal(str(gf.get("quantity") or 1)),
-                        "unit_of_measurement": str(gf.get("unit_of_measurement") or "Month").strip(),
-                        "unit_price": Decimal(str(gf.get("unit_price") or 0)),
-                        "discount_amount": Decimal(str(gf.get("discount_amount") or 0)),
-                        "tax_code": tax_code,
-                        "tax_rate": tax_rate,
-                        "custom_fields": line_cf,
-                    }
-                    if revenue_account_code:
-                        line_entry["revenue_account_code"] = revenue_account_code
-
-                    lines_payload.append(line_entry)
+                        revenue_account_code = LINE_TYPE_REVENUE_ACCOUNT.get(line_type)
+                        line_entry = {
+                            "description": str(gf.get("line_description") or "").strip(),
+                            "quantity": Decimal(str(gf.get("quantity") or 1)),
+                            "unit_of_measurement": str(gf.get("unit_of_measurement") or "Month").strip(),
+                            "unit_price": Decimal(str(gf.get("unit_price") or 0)),
+                            "discount_amount": Decimal(str(gf.get("discount_amount") or 0)),
+                            "tax_code": tax_code,
+                            "tax_rate": tax_rate,
+                            "custom_fields": line_cf,
+                        }
+                        if revenue_account_code:
+                            line_entry["revenue_account_code"] = revenue_account_code
+                        lines_payload.append(line_entry)
 
                 InvoicingService.invoice_create(
                     client_id=str(client.id),

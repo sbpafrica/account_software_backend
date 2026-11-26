@@ -75,10 +75,7 @@ def parse_spreadsheet_data(*, file_content: bytes, filename: str, columns_schema
     if not raw_rows:
         return [], []
 
-    header_row = raw_rows[0]
-    data_rows = raw_rows[1:]
-
-    # Build mapping from normalized file headers to schema columns
+    # Build mapping from normalized file headers (and aliases) to schema columns
     schema_by_norm_header = {}
     schema_by_norm_key = {}
     for col in columns_schema:
@@ -88,6 +85,30 @@ def parse_spreadsheet_data(*, file_content: bytes, filename: str, columns_schema
             schema_by_norm_header[norm_h] = col
         if norm_k:
             schema_by_norm_key[norm_k] = col
+        for alias in col.get("aliases", []) or []:
+            norm_a = _normalize_header(alias)
+            if norm_a and norm_a not in schema_by_norm_header:
+                schema_by_norm_header[norm_a] = col
+
+    # Smart header row detection: scan up to the first 10 non-empty rows and
+    # pick the row with the highest number of matching schema columns.
+    # This handles workbooks with title/banner rows above the real table headers
+    # (e.g. Row 1: "HR AND ADMIN COST...", Row 2: group headers, Row 3: real headers).
+    best_header_idx = 0
+    best_match_count = -1
+    for candidate_idx in range(min(10, len(raw_rows))):
+        candidate = raw_rows[candidate_idx]
+        matches = 0
+        for cell in candidate:
+            norm = _normalize_header(cell)
+            if norm and (norm in schema_by_norm_header or norm in schema_by_norm_key):
+                matches += 1
+        if matches > best_match_count:
+            best_match_count = matches
+            best_header_idx = candidate_idx
+
+    header_row = raw_rows[best_header_idx]
+    data_rows = raw_rows[best_header_idx + 1:]
 
     col_index_to_schema = {}
     unmapped_headers = []
@@ -103,7 +124,7 @@ def parse_spreadsheet_data(*, file_content: bytes, filename: str, columns_schema
             unmapped_headers.append(str(header).strip())
 
     parsed_rows = []
-    for row_idx, row in enumerate(data_rows, start=2):  # 1-based index (Excel row number)
+    for row_idx, row in enumerate(data_rows, start=best_header_idx + 2):  # 1-based Excel row number
         fields = {}
         extra_data = {}
         raw_row_dict = {}
