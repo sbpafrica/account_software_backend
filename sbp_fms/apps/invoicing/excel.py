@@ -41,6 +41,10 @@ def _resolve_invoice_cell_value(inv, line, col: dict):
         return float(inv.balance_due)
 
     if line is not None:
+        if key == "line_type":
+            if isinstance(line.custom_fields, dict) and "_line_type" in line.custom_fields:
+                return line.custom_fields["_line_type"]
+            return "OTHER"
         if key == "line_description":
             return line.description
         if key == "quantity":

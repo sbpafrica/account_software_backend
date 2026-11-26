@@ -597,6 +597,7 @@ class InvoicingService:
         # Perform General Ledger Posting
         ar_account = _get_or_create_account('1100-AR-GH', 'Accounts Receivable (Trade Debtors)', AccountType.ASSET)
         default_rev_account = _get_or_create_account('4010-REVENUE-GH', 'Service & Outsourcing Revenue', AccountType.REVENUE)
+        shuttle_rev_account = _get_or_create_account('4020-SHUTTLE-REVENUE-GH', 'Bus Shuttle & Transport Revenue', AccountType.REVENUE)
         tax_payable_account = _get_or_create_account('2020-TAX-PAYABLE-GH', 'Indirect Tax & VAT Payable', AccountType.LIABILITY)
 
         # Compile lines for GL entry
@@ -611,14 +612,34 @@ class InvoicingService:
         ]
 
         if invoice.subtotal > Decimal('0.0000'):
-            rev_account = invoice.category.income_account if (invoice.category and invoice.category.income_account) else default_rev_account
-            gl_lines.append({
-                'account': rev_account,
-                'debit': Decimal('0.0000'),
-                'credit': invoice.subtotal,
-                'client_id': invoice.client.id,
-                'country_code': 'GH',
-            })
+            # Split revenue by line type: Bus Shuttle lines → 4020-SHUTTLE-REVENUE-GH,
+            # all other lines → category income account or 4010-REVENUE-GH.
+            shuttle_subtotal = Decimal('0.0000')
+            regular_subtotal = Decimal('0.0000')
+            for inv_line in invoice.lines.all():
+                line_type = (inv_line.custom_fields or {}).get('_line_type', '')
+                if line_type == 'BUS_SHUTTLE':
+                    shuttle_subtotal += inv_line.line_total
+                else:
+                    regular_subtotal += inv_line.line_total
+
+            if regular_subtotal > Decimal('0.0000'):
+                rev_account = invoice.category.income_account if (invoice.category and invoice.category.income_account) else default_rev_account
+                gl_lines.append({
+                    'account': rev_account,
+                    'debit': Decimal('0.0000'),
+                    'credit': regular_subtotal,
+                    'client_id': invoice.client.id,
+                    'country_code': 'GH',
+                })
+            if shuttle_subtotal > Decimal('0.0000'):
+                gl_lines.append({
+                    'account': shuttle_rev_account,
+                    'debit': Decimal('0.0000'),
+                    'credit': shuttle_subtotal,
+                    'client_id': invoice.client.id,
+                    'country_code': 'GH',
+                })
 
         if invoice.tax_amount > Decimal('0.0000'):
             gl_lines.append({

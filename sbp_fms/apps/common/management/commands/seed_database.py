@@ -510,7 +510,9 @@ class Command(BaseCommand):
 
             # REVENUE (4000 - 4999)
             ('4010', 'Accounting & Management Advisory Revenue', AccountType.REVENUE, 'Operating Revenue', Decimal('0.0000')),
-            ('4020', 'Payroll Escrow Administration Fees', AccountType.REVENUE, 'Operating Revenue', Decimal('0.0000')),
+            ('4015', 'Manpower & HR Outsourcing Revenue', AccountType.REVENUE, 'Operating Revenue', Decimal('0.0000')),
+            ('4020', 'Bus Shuttle & Transport Revenue', AccountType.REVENUE, 'Operating Revenue', Decimal('0.0000')),
+            ('4025', 'Payroll Escrow Administration Fees', AccountType.REVENUE, 'Operating Revenue', Decimal('0.0000')),
             ('4030', 'Software SaaS Subscription Income', AccountType.REVENUE, 'Operating Revenue', Decimal('0.0000')),
 
             # DIRECT COSTS (5000 - 5999)

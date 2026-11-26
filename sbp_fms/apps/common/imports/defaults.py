@@ -623,6 +623,24 @@ DEFAULT_IMPORT_SCHEMAS = {
             "sample_value": "PO-2026-0091",
         },
         {
+            "header_name": "Line Type",
+            "field_key": "line_type",
+            "system_field": "line_type",
+            "data_type": "choice",
+            "choices": ["HR_COST", "SERVICE_FEE", "BUS_SHUTTLE", "OTHER"],
+            "is_required": True,
+            "default_value": "HR_COST",
+            "description": (
+                "Type of charge on this line. "
+                "HR_COST: manpower / payroll pass-through (EXEMPT from Ghana indirect tax, subject to no WHT). "
+                "SERVICE_FEE: management / service charge (VAT_STANDARD — NHIL 2.5%, GETFund 2.5%, COVID 1%, VAT 15% cascade; WHT 7.5% deducted by client). "
+                "BUS_SHUTTLE: transport income posted to 4020-SHUTTLE-REVENUE-GH (VAT_STANDARD). "
+                "OTHER: custom line, honour Tax Code column."
+            ),
+            "is_custom": False,
+            "sample_value": "HR_COST",
+        },
+        {
             "header_name": "Line Description",
             "field_key": "line_description",
             "system_field": "line_description",
@@ -631,7 +649,18 @@ DEFAULT_IMPORT_SCHEMAS = {
             "default_value": "",
             "description": "Description of the billed service or product.",
             "is_custom": False,
-            "sample_value": "Monthly Outsourced Engineering Support",
+            "sample_value": "Manpower Supply — January 2025",
+        },
+        {
+            "header_name": "No. of Employees",
+            "field_key": "no_of_employees",
+            "system_field": "no_of_employees",
+            "data_type": "number",
+            "is_required": False,
+            "default_value": 0,
+            "description": "Number of employees / headcount billed (stored as custom field on the line). Required for HR_COST and SERVICE_FEE lines.",
+            "is_custom": True,
+            "sample_value": 73,
         },
         {
             "header_name": "Quantity",
@@ -640,9 +669,9 @@ DEFAULT_IMPORT_SCHEMAS = {
             "data_type": "number",
             "is_required": True,
             "default_value": 1.0,
-            "description": "Billed quantity or hours.",
+            "description": "Billed quantity (1 for a lump-sum monthly charge).",
             "is_custom": False,
-            "sample_value": 10.0,
+            "sample_value": 1.0,
         },
         {
             "header_name": "Unit",
@@ -650,10 +679,10 @@ DEFAULT_IMPORT_SCHEMAS = {
             "system_field": "unit_of_measurement",
             "data_type": "string",
             "is_required": False,
-            "default_value": "Unit",
-            "description": "Unit of measurement (e.g. Hours, Days, Month, Unit).",
+            "default_value": "Month",
+            "description": "Unit of measurement (e.g. Month, Hours, Days, Unit).",
             "is_custom": False,
-            "sample_value": "Hours",
+            "sample_value": "Month",
         },
         {
             "header_name": "Unit Price",
@@ -662,9 +691,9 @@ DEFAULT_IMPORT_SCHEMAS = {
             "data_type": "number",
             "is_required": True,
             "default_value": 0.0,
-            "description": "Price per unit before tax.",
+            "description": "Amount for this line before tax. For HR_COST use the gross HR cost; for SERVICE_FEE use the management/service charge.",
             "is_custom": False,
-            "sample_value": 250.00,
+            "sample_value": 79873.00,
         },
         {
             "header_name": "Discount",
@@ -684,10 +713,13 @@ DEFAULT_IMPORT_SCHEMAS = {
             "data_type": "choice",
             "choices": ["VAT_STANDARD", "EXEMPT", "ZERO"],
             "is_required": False,
-            "default_value": "VAT_STANDARD",
-            "description": "Tax treatment: VAT_STANDARD, EXEMPT, or ZERO.",
+            "default_value": "EXEMPT",
+            "description": (
+                "Overrides the tax treatment derived from Line Type. "
+                "Leave blank to let Line Type decide: HR_COST→EXEMPT, SERVICE_FEE/BUS_SHUTTLE→VAT_STANDARD."
+            ),
             "is_custom": False,
-            "sample_value": "VAT_STANDARD",
+            "sample_value": "EXEMPT",
         },
         {
             "header_name": "Notes",
@@ -696,9 +728,9 @@ DEFAULT_IMPORT_SCHEMAS = {
             "data_type": "string",
             "is_required": False,
             "default_value": "",
-            "description": "Additional invoice remarks or payment instructions.",
+            "description": "Additional invoice remarks or payment instructions (applied to invoice header, same value across all rows of one invoice).",
             "is_custom": False,
-            "sample_value": "Thank you for your business.",
+            "sample_value": "Payment due 30 days from invoice date.",
         },
     ],
 }

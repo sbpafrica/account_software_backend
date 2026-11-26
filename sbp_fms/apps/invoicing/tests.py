@@ -499,6 +499,7 @@ class TestInvoicingExcelImportAndExport:
             {"header_name": "Customer ID", "field_key": "client_code", "system_field": "client_code", "data_type": "string", "is_required": True, "is_custom": False},
             {"header_name": "Bill Date", "field_key": "issue_date", "system_field": "issue_date", "data_type": "date", "is_required": True, "is_custom": False},
             {"header_name": "Pay By", "field_key": "due_date", "system_field": "due_date", "data_type": "date", "is_required": True, "is_custom": False},
+            {"header_name": "Charge Type", "field_key": "line_type", "system_field": "line_type", "data_type": "choice", "choices": ["HR_COST", "SERVICE_FEE", "BUS_SHUTTLE", "OTHER"], "is_required": True, "default_value": "OTHER", "is_custom": False},
             {"header_name": "Service Details", "field_key": "line_description", "system_field": "line_description", "data_type": "string", "is_required": True, "is_custom": False},
             {"header_name": "Qty", "field_key": "quantity", "system_field": "quantity", "data_type": "number", "is_required": True, "is_custom": False},
             {"header_name": "Rate", "field_key": "unit_price", "system_field": "unit_price", "data_type": "number", "is_required": True, "is_custom": False},
@@ -517,18 +518,19 @@ class TestInvoicingExcelImportAndExport:
         assert res_dl.status_code == 200
         wb_tpl = openpyxl.load_workbook(io.BytesIO(res_dl.content))
         ws_tpl = wb_tpl.active
-        headers = [ws_tpl.cell(row=1, column=c).value for c in range(1, 9)]
+        headers = [ws_tpl.cell(row=1, column=c).value for c in range(1, 10)]
         assert headers[0] == "Inv Ref"
         assert headers[1] == "Customer ID *"
-        assert headers[4] == "Service Details *"
-        assert headers[7] == "Mine Site"
+        assert headers[4] == "Charge Type *"
+        assert headers[5] == "Service Details *"
+        assert headers[8] == "Mine Site"
 
-        # 3. Build Excel upload with 2 lines sharing INV-XLS-001
+        # 3. Build Excel upload with 2 lines sharing INV-XLS-001 (HR_COST exempt + SERVICE_FEE taxable)
         wb_up = openpyxl.Workbook()
         ws_up = wb_up.active
-        ws_up.append(["Inv Ref", "Customer ID", "Bill Date", "Pay By", "Service Details", "Qty", "Rate", "Mine Site"])
-        ws_up.append(["INV-XLS-001", client.code, "2026-11-26", "2026-12-26", "Rig Maintenance", 10, 500, "Tarkwa"])
-        ws_up.append(["INV-XLS-001", client.code, "2026-11-26", "2026-12-26", "Safety Audit", 2, 1000, "Tarkwa"])
+        ws_up.append(["Inv Ref", "Customer ID", "Bill Date", "Pay By", "Charge Type", "Service Details", "Qty", "Rate", "Mine Site"])
+        ws_up.append(["INV-XLS-001", client.code, "2026-11-26", "2026-12-26", "HR_COST", "Manpower Supply", 1, 5000, "Tarkwa"])
+        ws_up.append(["INV-XLS-001", client.code, "2026-11-26", "2026-12-26", "SERVICE_FEE", "Management Fee", 1, 2000, "Tarkwa"])
         buf_up = io.BytesIO()
         wb_up.save(buf_up)
         buf_up.seek(0)
@@ -559,15 +561,52 @@ class TestInvoicingExcelImportAndExport:
         assert inv.lines.count() == 2
         assert inv.subtotal == Decimal('7000.0000')
         assert inv.custom_fields.get('site_name') == 'Tarkwa'
+        # HR_COST line is EXEMPT; SERVICE_FEE line is VAT_STANDARD (taxed only on 2000, not 7000)
+        lines_by_desc = {l.description: l for l in inv.lines.all()}
+        assert lines_by_desc["Manpower Supply"].tax_code == "EXEMPT"
+        assert lines_by_desc["Management Fee"].tax_code == "VAT_STANDARD"
+        assert inv.tax_amount > Decimal('0.0000')
 
         # 5. Export invoices using custom Excel headers
         res_exp = api_client.get(f'/api/v1/invoicing/invoices/export/?template_id={tpl_id}')
         assert res_exp.status_code == 200
         wb_exp = openpyxl.load_workbook(io.BytesIO(res_exp.content))
         ws_exp = wb_exp.active
-        exp_headers = [ws_exp.cell(row=1, column=c).value for c in range(1, 9)]
-        assert exp_headers == ["Inv Ref", "Customer ID", "Bill Date", "Pay By", "Service Details", "Qty", "Rate", "Mine Site"]
+        exp_headers = [ws_exp.cell(row=1, column=c).value for c in range(1, 10)]
+        assert exp_headers == ["Inv Ref", "Customer ID", "Bill Date", "Pay By", "Charge Type", "Service Details", "Qty", "Rate", "Mine Site"]
         assert ws_exp.cell(row=2, column=1).value == "INV-XLS-001"
-        assert ws_exp.cell(row=2, column=5).value == "Rig Maintenance"
-        assert ws_exp.cell(row=2, column=8).value == "Tarkwa"
-        assert ws_exp.cell(row=3, column=5).value == "Safety Audit"
+        assert ws_exp.cell(row=2, column=5).value == "HR_COST"
+        assert ws_exp.cell(row=2, column=6).value == "Manpower Supply"
+        assert ws_exp.cell(row=2, column=9).value == "Tarkwa"
+        assert ws_exp.cell(row=3, column=5).value == "SERVICE_FEE"
+        assert ws_exp.cell(row=3, column=6).value == "Management Fee"
+
+        # 6. Verify BUS_SHUTTLE line splits revenue to 4020-SHUTTLE-REVENUE-GH upon approval
+        shuttle_inv = InvoicingService.invoice_create(
+            client_id=str(client.id),
+            issue_date=datetime.date(2026, 11, 26),
+            due_date=datetime.date(2026, 12, 26),
+            invoice_number="INV-SHUTTLE-001",
+            lines=[
+                {
+                    "description": "Manpower Supply",
+                    "quantity": Decimal("1"),
+                    "unit_price": Decimal("1000.00"),
+                    "tax_code": "EXEMPT",
+                    "custom_fields": {"_line_type": "HR_COST"},
+                },
+                {
+                    "description": "Staff Bus Shuttle",
+                    "quantity": Decimal("1"),
+                    "unit_price": Decimal("500.00"),
+                    "tax_code": "VAT_STANDARD",
+                    "custom_fields": {"_line_type": "BUS_SHUTTLE"},
+                },
+            ],
+            user=user,
+        )
+        shuttle_inv = InvoicingService.invoice_approve(invoice_id=str(shuttle_inv.id), user=user)
+        je_lines = shuttle_inv.journal_entry.lines.select_related('account').all()
+        credits_by_acct = {jl.account.code: jl.credit for jl in je_lines if jl.credit > 0}
+        assert credits_by_acct.get("4010-REVENUE-GH") == Decimal("1000.0000")
+        assert credits_by_acct.get("4020-SHUTTLE-REVENUE-GH") == Decimal("500.0000")
